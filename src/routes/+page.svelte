@@ -25,7 +25,6 @@
 		'30days': 'this month',
 		year: 'this year'
 	};
-	// Use $derived to make periodLabel reactive to data.period changes
 	const periodLabel = $derived(periodLabels[data.period] || 'today');
 
 	// Show loading state during navigation
@@ -65,7 +64,7 @@
 	function handlePeriodChange(period: string) {
 		const url = new URL($page.url);
 		url.searchParams.set('period', period);
-		url.searchParams.delete('page'); // Reset to page 1
+		url.searchParams.delete('page');
 		goto(url.toString(), { replaceState: true });
 	}
 
@@ -148,9 +147,9 @@
 	<div class="mb-8 text-center">
 		<div class="mb-4 flex items-center justify-center gap-3">
 			<Trophy class="h-10 w-10 text-yellow-500" />
-			<h1 class="text-3xl font-bold tracking-tight sm:text-4xl">GitHub Commit Leaderboard</h1>
+			<h1 class="text-3xl font-bold tracking-tight sm:text-4xl">Commit Rank</h1>
 		</div>
-		<p class="text-muted-foreground">See who's shipping the most code</p>
+		<p class="text-muted-foreground">GitHub Commit Leaderboard</p>
 	</div>
 
 	<!-- Stats Summary -->
