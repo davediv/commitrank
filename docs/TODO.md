@@ -578,7 +578,7 @@ This document outlines the development tasks for **CommitRank**, a web applicati
     - Verify no Cumulative Layout Shift (CLS) in DevTools
   - **Dependencies**: UI-P2-002
 
-- [ ] 🟢 **PERF-P3-004**: Ensure bundle size stays within budget
+- [x] 🟢 **PERF-P3-004**: Ensure bundle size stays within budget
   - **Success Criteria**:
     - Initial JS bundle < 100KB gzipped
     - Initial CSS bundle < 30KB gzipped
@@ -589,7 +589,7 @@ This document outlines the development tasks for **CommitRank**, a web applicati
 
 ### Security Implementation
 
-- [ ] 🟡 **SEC-P3-001**: Implement input sanitization for all user inputs
+- [x] 🟡 **SEC-P3-001**: Implement input sanitization for all user inputs
   - **Success Criteria**:
     - GitHub username validated on server (not just client)
     - Twitter handle validated on server
@@ -598,7 +598,7 @@ This document outlines the development tasks for **CommitRank**, a web applicati
     - No SQL injection possible (parameterized queries)
   - **Dependencies**: API-P2-003, API-P2-006
 
-- [ ] 🟡 **SEC-P3-002**: Configure CORS headers for API routes
+- [x] 🟡 **SEC-P3-002**: Configure CORS headers for API routes
   - **Success Criteria**:
     - CORS allows commitrank.dev origin only in production
     - CORS allows localhost in development
@@ -606,7 +606,7 @@ This document outlines the development tasks for **CommitRank**, a web applicati
     - Non-allowed origins receive 403
   - **Dependencies**: API-P2-002
 
-- [ ] 🟢 **SEC-P3-003**: Implement Content Security Policy headers
+- [x] 🟢 **SEC-P3-003**: Implement Content Security Policy headers
   - **Success Criteria**:
     - CSP header set in response
     - Script sources restricted to self
