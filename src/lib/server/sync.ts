@@ -9,7 +9,13 @@ import { createDb } from './db';
 import { users, contributions } from './db/schema';
 import { eq, asc } from 'drizzle-orm';
 import { fetchContributions, GitHubApiError } from './github';
-import { invalidateLeaderboardCache, deleteCached, statsKey } from './cache';
+import {
+	invalidateLeaderboardCache,
+	deleteCached,
+	statsKey,
+	lastSyncKey,
+	setCached
+} from './cache';
 
 /**
  * Result of syncing a single user
@@ -196,8 +202,14 @@ export async function runScheduledSync(
 		}
 	}
 
-	// Invalidate all caches after sync
-	await Promise.all([invalidateLeaderboardCache(kv), deleteCached(kv, statsKey())]);
+	// Invalidate all caches after sync and store last sync timestamp
+	const syncCompletedAt = new Date().toISOString();
+	await Promise.all([
+		invalidateLeaderboardCache(kv),
+		deleteCached(kv, statsKey()),
+		// Store last sync timestamp (TTL: 24 hours - long enough to survive between syncs)
+		setCached(kv, lastSyncKey(), syncCompletedAt, 86400)
+	]);
 
 	const durationMs = Date.now() - startTime;
 
