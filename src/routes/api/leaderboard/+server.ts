@@ -11,6 +11,7 @@ import {
 	type LeaderboardEntry,
 	type LeaderboardResponse
 } from '$lib/types';
+import { getCached, setCached, leaderboardKey, CACHE_TTL } from '$lib/server/cache';
 
 const VALID_PERIODS: ContributionPeriod[] = ['today', '7days', '30days', 'year'];
 const MAX_LIMIT = 100;
@@ -85,6 +86,16 @@ export const GET: RequestHandler = async ({ url, platform }) => {
 	limit = Math.min(limit, MAX_LIMIT);
 
 	try {
+		const kv = platform!.env.KV;
+		const cacheKey = leaderboardKey(period, page, limit);
+
+		// Check cache first
+		const cachedResponse = await getCached<LeaderboardResponse>(kv, cacheKey);
+		if (cachedResponse) {
+			return json(createSuccessResponse(cachedResponse, { cached: true }));
+		}
+
+		// Cache miss - query database
 		const db = createDb(platform!.env.DB);
 		const { startDate, endDate } = getDateRange(period);
 		const offset = (page - 1) * limit;
@@ -143,7 +154,10 @@ export const GET: RequestHandler = async ({ url, platform }) => {
 			}
 		};
 
-		return json(createSuccessResponse(response));
+		// Cache the response
+		await setCached(kv, cacheKey, response, CACHE_TTL.LEADERBOARD);
+
+		return json(createSuccessResponse(response, { cached: false }));
 	} catch (error) {
 		console.error('Leaderboard API error:', error);
 		return json(createErrorResponse(API_ERROR_CODES.INTERNAL_ERROR, 'An internal error occurred'), {
