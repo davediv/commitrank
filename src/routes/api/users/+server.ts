@@ -10,6 +10,7 @@ import {
 	type CreateUserRequest
 } from '$lib/types';
 import { fetchContributions, parseGitHubNodeId, GitHubApiError } from '$lib/server/github';
+import { invalidateLeaderboardCache, deleteCached, statsKey } from '$lib/server/cache';
 
 // Validation patterns
 const GITHUB_USERNAME_REGEX = /^[a-zA-Z0-9](?:[a-zA-Z0-9]|-(?=[a-zA-Z0-9])){0,38}$/;
@@ -169,6 +170,10 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 
 		// Calculate initial rank
 		const rank = await calculateUserRank(db, insertedUser.id);
+
+		// Invalidate cache after successful registration
+		const kv = platform!.env.KV;
+		await Promise.all([invalidateLeaderboardCache(kv), deleteCached(kv, statsKey())]);
 
 		return json(
 			createSuccessResponse({
