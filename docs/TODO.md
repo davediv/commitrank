@@ -507,7 +507,7 @@ This document outlines the development tasks for **CommitRank**, a web applicati
 
 ### Feature: Scheduled Data Sync
 
-- [ ] 🔴 **FEAT-P2-003**: Implement Cloudflare Cron Trigger handler
+- [x] 🔴 **FEAT-P2-003**: Implement Cloudflare Cron Trigger handler
   - **Success Criteria**:
     - Cron handler in Worker (handles `scheduled` event)
     - Cron schedule configured in wrangler.jsonc: `0 */6 * * *` (every 6 hours)
@@ -518,7 +518,7 @@ This document outlines the development tasks for **CommitRank**, a web applicati
     - Handler logs sync summary (success/failure counts)
   - **Dependencies**: API-P2-005, CACHE-P2-001, DB-P1-005
 
-- [ ] 🔴 **FEAT-P2-004**: Implement user contribution sync function
+- [x] 🔴 **FEAT-P2-004**: Implement user contribution sync function
   - **Success Criteria**:
     - Function fetches contribution data from GitHub GraphQL
     - Function parses daily contributions for past 365 days
@@ -528,7 +528,7 @@ This document outlines the development tasks for **CommitRank**, a web applicati
     - Function returns success/failure status
   - **Dependencies**: API-P2-005, DB-P1-002
 
-- [ ] 🟡 **FEAT-P2-005**: Handle scheduled sync partial failures
+- [x] 🟡 **FEAT-P2-005**: Handle scheduled sync partial failures
   - **Success Criteria**:
     - Individual user sync failures don't stop entire job
     - Failed user syncs logged with username and error

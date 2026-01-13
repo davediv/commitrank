@@ -1,9 +1,13 @@
 // See https://svelte.dev/docs/kit/types#app.d.ts
 // for information about these interfaces
+
 declare global {
 	namespace App {
 		interface Platform {
-			env: Env;
+			env: Env & {
+				/** Secret key for authenticating scheduled sync API calls (set via wrangler secret) */
+				CRON_SECRET?: string;
+			};
 			ctx: ExecutionContext;
 			caches: CacheStorage;
 			cf: CfProperties & IncomingRequestCfProperties;
