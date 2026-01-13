@@ -627,7 +627,7 @@ This document outlines the development tasks for **CommitRank**, a web applicati
     - Code coverage > 80% for utility functions
   - **Dependencies**: API-P2-001, RATE-P2-001, CACHE-P2-001
 
-- [ ] 🟡 **TEST-P3-002**: Write integration tests for API endpoints
+- [x] 🟡 **TEST-P3-002**: Write integration tests for API endpoints
   - **Success Criteria**:
     - Test GET /api/leaderboard with different periods
     - Test POST /api/users with valid/invalid data
