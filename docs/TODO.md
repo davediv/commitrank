@@ -617,7 +617,7 @@ This document outlines the development tasks for **CommitRank**, a web applicati
 
 ### Testing & Quality Assurance
 
-- [ ] 🟡 **TEST-P3-001**: Write unit tests for API utility functions
+- [x] 🟡 **TEST-P3-001**: Write unit tests for API utility functions
   - **Success Criteria**:
     - Tests for GitHub username validation function
     - Tests for Twitter handle validation function
