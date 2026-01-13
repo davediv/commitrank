@@ -417,7 +417,7 @@ This document outlines the development tasks for **CommitRank**, a web applicati
     - Click Previous and verify returns to prior page
   - **Dependencies**: UI-P2-002, FEAT-P2-001
 
-- [ ] 🟡 **UI-P2-004**: Implement loading skeleton for leaderboard
+- [x] 🟡 **UI-P2-004**: Implement loading skeleton for leaderboard
   - **Success Criteria**:
     - Skeleton component shown while data loads
     - Skeleton mimics table row structure
