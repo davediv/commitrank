@@ -15,9 +15,18 @@ import {
 import { getCached, setCached, deleteCached, userKey, CACHE_TTL } from '$lib/server/cache';
 import { checkRateLimit, rateLimitKey, RATE_LIMITS } from '$lib/server/ratelimit';
 
+// Validation patterns
+const GITHUB_USERNAME_REGEX = /^[a-zA-Z0-9](?:[a-zA-Z0-9]|-(?=[a-zA-Z0-9])){0,38}$/;
 const TWITTER_HANDLE_REGEX = /^[a-zA-Z0-9_]{1,15}$/;
 
 const PERIODS: ContributionPeriod[] = ['today', '7days', '30days', 'year'];
+
+/**
+ * Validate GitHub username format
+ */
+function isValidGitHubUsername(username: string): boolean {
+	return GITHUB_USERNAME_REGEX.test(username);
+}
 
 /**
  * Get date range for contribution period
@@ -49,6 +58,14 @@ function getDateRange(period: ContributionPeriod): { startDate: string; endDate:
 
 export const GET: RequestHandler = async ({ params, platform }) => {
 	const { username } = params;
+
+	// Validate username format
+	if (!username || !isValidGitHubUsername(username)) {
+		return json(
+			createErrorResponse(API_ERROR_CODES.INVALID_USERNAME, 'Invalid GitHub username format'),
+			{ status: 400 }
+		);
+	}
 
 	try {
 		const kv = platform!.env.KV;
@@ -163,6 +180,14 @@ export const GET: RequestHandler = async ({ params, platform }) => {
 
 export const PATCH: RequestHandler = async ({ params, request, platform, getClientAddress }) => {
 	const { username } = params;
+
+	// Validate username format
+	if (!username || !isValidGitHubUsername(username)) {
+		return json(
+			createErrorResponse(API_ERROR_CODES.INVALID_USERNAME, 'Invalid GitHub username format'),
+			{ status: 400 }
+		);
+	}
 
 	// Rate limit check
 	const kv = platform!.env.KV;
