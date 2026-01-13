@@ -435,7 +435,7 @@ This document outlines the development tasks for **CommitRank**, a web applicati
 
 ### Feature: User Registration
 
-- [ ] 🔴 **FEAT-P2-002**: Implement /join route with server actions
+- [x] 🔴 **FEAT-P2-002**: Implement /join route with server actions
   - **Success Criteria**:
     - Page at `src/routes/join/+page.svelte`
     - Form action in `src/routes/join/+page.server.ts`
@@ -445,7 +445,7 @@ This document outlines the development tasks for **CommitRank**, a web applicati
     - Proper CSRF protection via SvelteKit form actions
   - **Dependencies**: API-P2-003
 
-- [ ] 🔴 **UI-P2-005**: Implement registration form component
+- [x] 🔴 **UI-P2-005**: Implement registration form component
   - **Success Criteria**:
     - Form heading: "Join the CommitRank Leaderboard"
     - GitHub username input (required, with label)
@@ -466,7 +466,7 @@ This document outlines the development tasks for **CommitRank**, a web applicati
     - Check Network tab for form submission
   - **Dependencies**: FEAT-P2-002, UI-P1-002
 
-- [ ] 🔴 **UI-P2-006**: Implement client-side form validation
+- [x] 🔴 **UI-P2-006**: Implement client-side form validation
   - **Success Criteria**:
     - GitHub username: required validation
     - GitHub username: format validation (1-39 chars, alphanumeric + hyphen)
@@ -485,7 +485,7 @@ This document outlines the development tasks for **CommitRank**, a web applicati
     - Verify submit button shows loading state during submission
   - **Dependencies**: UI-P2-005
 
-- [ ] 🟡 **UI-P2-007**: Implement success/error feedback for registration
+- [x] 🟡 **UI-P2-007**: Implement success/error feedback for registration
   - **Success Criteria**:
     - Success: shows Alert with "Successfully joined!" message
     - Success: displays user's initial rank
