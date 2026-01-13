@@ -12,5 +12,6 @@
 		"strict": true,
 		"moduleResolution": "bundler",
 		"types": ["./src/worker-configuration.d.ts", "./worker-configuration.d.ts"]
-	}
+	},
+	"exclude": ["src/**/*.svelte.spec.ts"]
 }
