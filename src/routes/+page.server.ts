@@ -2,7 +2,7 @@ import type { PageServerLoad } from './$types';
 import { createDb } from '$lib/server/db';
 import { users, contributions } from '$lib/server/db/schema';
 import { eq, sql, desc, and, gte } from 'drizzle-orm';
-import { getCached, setCached, leaderboardKey, CACHE_TTL } from '$lib/server/cache';
+import { getCached, setCached, leaderboardKey, lastSyncKey, CACHE_TTL } from '$lib/server/cache';
 import type {
 	ContributionPeriod,
 	LeaderboardEntry,
@@ -174,21 +174,22 @@ export const load: PageServerLoad = async ({ url, platform, setHeaders }) => {
 		const now = new Date();
 		const todayStr = now.toISOString().split('T')[0];
 
-		const [totalUsersResult, todayContribResult] = await Promise.all([
+		const [totalUsersResult, todayContribResult, lastSync] = await Promise.all([
 			db.select({ count: sql<number>`COUNT(*)` }).from(users),
 			db
 				.select({
 					total: sql<number>`COALESCE(SUM(${contributions.total_contributions}), 0)`
 				})
 				.from(contributions)
-				.where(sql`${contributions.date} = ${todayStr}`)
+				.where(sql`${contributions.date} = ${todayStr}`),
+			getCached<string>(kv, lastSyncKey())
 		]);
 
 		stats = {
 			total_users: Number(totalUsersResult[0]?.count || 0),
 			total_contributions_today: Number(todayContribResult[0]?.total || 0),
 			total_contributions_year: 0, // Not needed for display
-			last_sync: null,
+			last_sync: lastSync,
 			next_sync: calculateNextSync()
 		};
 	} catch {

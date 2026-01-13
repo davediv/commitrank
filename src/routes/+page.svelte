@@ -3,7 +3,7 @@
 	import { navigating, page } from '$app/stores';
 	import { resolve } from '$app/paths';
 	import { onMount } from 'svelte';
-	import { Trophy, Github, Twitter, Users, Activity, CheckCircle } from '@lucide/svelte';
+	import { Trophy, Github, Twitter, Users, Activity, CheckCircle, Clock } from '@lucide/svelte';
 	import * as Tabs from '$lib/components/ui/tabs';
 	import * as Table from '$lib/components/ui/table';
 	import * as Avatar from '$lib/components/ui/avatar';
@@ -87,6 +87,25 @@
 		// GitHub avatar URL with size parameter (2x for retina: 64px for 32px display)
 		return url.includes('?') ? `${url}&s=${size}` : `${url}?s=${size}`;
 	}
+
+	/**
+	 * Format an ISO date string to relative time (e.g., "2 hours ago")
+	 */
+	function formatRelativeTime(isoString: string | null): string {
+		if (!isoString) return 'Never';
+
+		const date = new Date(isoString);
+		const now = new Date();
+		const diffMs = now.getTime() - date.getTime();
+		const diffMins = Math.floor(diffMs / 60000);
+		const diffHours = Math.floor(diffMins / 60);
+		const diffDays = Math.floor(diffHours / 24);
+
+		if (diffMins < 1) return 'Just now';
+		if (diffMins < 60) return `${diffMins} min${diffMins === 1 ? '' : 's'} ago`;
+		if (diffHours < 24) return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
+		return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
+	}
 </script>
 
 <!-- SEO Meta Tags -->
@@ -164,6 +183,10 @@
 			<div class="flex items-center gap-2">
 				<Activity class="h-4 w-4" />
 				<span>{formatNumber(data.stats.total_contributions_today)} contributions today</span>
+			</div>
+			<div class="flex items-center gap-2" title={data.stats.last_sync || 'Never synced'}>
+				<Clock class="h-4 w-4" />
+				<span>Updated {formatRelativeTime(data.stats.last_sync)}</span>
 			</div>
 		</div>
 	{/if}

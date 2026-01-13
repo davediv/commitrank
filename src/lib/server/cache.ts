@@ -25,7 +25,8 @@ export const CACHE_KEYS = {
 	LEADERBOARD: 'leaderboard',
 	USER: 'user',
 	GITHUB: 'github',
-	STATS: 'stats'
+	STATS: 'stats',
+	LAST_SYNC: 'last_sync'
 } as const;
 
 /**
@@ -54,6 +55,13 @@ export function githubKey(username: string): string {
  */
 export function statsKey(): string {
 	return CACHE_KEYS.STATS;
+}
+
+/**
+ * Generate a cache key for last sync timestamp
+ */
+export function lastSyncKey(): string {
+	return CACHE_KEYS.LAST_SYNC;
 }
 
 /**
