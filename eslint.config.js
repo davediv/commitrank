@@ -37,5 +37,13 @@ export default defineConfig(
 				svelteConfig
 			}
 		}
+	},
+	{
+		// Disable navigation rule for shadcn-svelte UI components
+		// These components receive href as external props
+		files: ['src/lib/components/ui/**/*.svelte'],
+		rules: {
+			'svelte/no-navigation-without-resolve': 'off'
+		}
 	}
 );
