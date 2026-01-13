@@ -565,7 +565,7 @@ This document outlines the development tasks for **CommitRank**, a web applicati
     - Disable JavaScript and reload → verify content still visible
   - **Dependencies**: FEAT-P2-001, UI-P2-001
 
-- [ ] 🟢 **PERF-P3-003**: Implement image optimization for avatars
+- [x] 🟢 **PERF-P3-003**: Implement image optimization for avatars
   - **Success Criteria**:
     - Avatar images use lazy loading (loading="lazy")
     - Avatar URLs use GitHub's size parameter (e.g., `?s=48`)
