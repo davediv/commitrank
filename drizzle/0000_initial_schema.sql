@@ -37,7 +37,14 @@ CREATE INDEX IF NOT EXISTS users_github_username_idx ON users(github_username);
 CREATE INDEX IF NOT EXISTS users_updated_at_idx ON users(updated_at);
 
 -- Create indexes for contributions table
+-- user_id_idx: Efficient lookup of all contributions for a user
 CREATE INDEX IF NOT EXISTS contributions_user_id_idx ON contributions(user_id);
+-- date_idx: Filter contributions by date range
 CREATE INDEX IF NOT EXISTS contributions_date_idx ON contributions(date);
+-- user_date_idx: Composite for user+date lookups (used in sync)
 CREATE INDEX IF NOT EXISTS contributions_user_date_idx ON contributions(user_id, date);
+-- total_contributions_idx: Order by contribution count
 CREATE INDEX IF NOT EXISTS contributions_total_contributions_idx ON contributions(total_contributions);
+-- date_total_idx: Covering index for leaderboard aggregation queries
+-- (optimizes: GROUP BY with date range filter and SUM aggregation)
+CREATE INDEX IF NOT EXISTS contributions_date_total_idx ON contributions(date, total_contributions);

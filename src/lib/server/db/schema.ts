@@ -90,11 +90,19 @@ export const contributions = sqliteTable(
 	(table) => [
 		// Unique constraint on (user_id, date) combination
 		unique('contributions_user_date_unique').on(table.user_id, table.date),
-		// Performance indexes
+
+		// Performance indexes for query optimization:
+		// - user_id_idx: Efficient lookup of all contributions for a user
+		// - date_idx: Filter contributions by date range
+		// - user_date_idx: Composite for user+date lookups (used in sync)
+		// - total_contributions_idx: Order by contribution count
+		// - date_total_idx: Covering index for leaderboard aggregation queries
+		//   (optimizes: GROUP BY with date range filter and SUM aggregation)
 		index('contributions_user_id_idx').on(table.user_id),
 		index('contributions_date_idx').on(table.date),
 		index('contributions_user_date_idx').on(table.user_id, table.date),
-		index('contributions_total_contributions_idx').on(table.total_contributions)
+		index('contributions_total_contributions_idx').on(table.total_contributions),
+		index('contributions_date_total_idx').on(table.date, table.total_contributions)
 	]
 );
 
