@@ -18,6 +18,15 @@
 
 	let { data }: Props = $props();
 
+	// SEO: Generate period label for meta description
+	const periodLabels: Record<string, string> = {
+		today: 'today',
+		'7days': 'this week',
+		'30days': 'this month',
+		year: 'this year'
+	};
+	const periodLabel = periodLabels[data.period] || 'today';
+
 	// Show loading state during navigation
 	let isLoading = $derived(!!$navigating);
 
@@ -80,6 +89,37 @@
 		return url.includes('?') ? `${url}&s=${size}` : `${url}?s=${size}`;
 	}
 </script>
+
+<!-- SEO Meta Tags -->
+<svelte:head>
+	<title>CommitRank - GitHub Commit Leaderboard</title>
+	<meta
+		name="description"
+		content="See who's shipping the most code {periodLabel}. Top GitHub contributors ranked by commits."
+	/>
+	<meta property="og:title" content="CommitRank - GitHub Commit Leaderboard" />
+	<meta
+		property="og:description"
+		content="See who's shipping the most code. Top GitHub contributors ranked by commits."
+	/>
+	<meta property="og:type" content="website" />
+	<meta name="twitter:card" content="summary" />
+	<meta name="twitter:title" content="CommitRank - GitHub Commit Leaderboard" />
+	<meta
+		name="twitter:description"
+		content="See who's shipping the most code. Top GitHub contributors ranked by commits."
+	/>
+</svelte:head>
+
+<!-- Noscript fallback message -->
+<noscript>
+	<div
+		class="border-b border-yellow-200 bg-yellow-50 px-4 py-2 text-center text-sm text-yellow-800"
+	>
+		JavaScript is disabled. Tab switching and pagination require JavaScript, but the leaderboard
+		content is fully visible.
+	</div>
+</noscript>
 
 <div class="container mx-auto px-4 py-8">
 	<!-- Success Alert -->
