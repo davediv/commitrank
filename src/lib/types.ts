@@ -139,6 +139,14 @@ export interface CreateUserRequest {
 }
 
 /**
+ * Request body for user update
+ */
+export interface UpdateUserRequest {
+	/** Twitter/X handle */
+	twitter_handle?: string | null;
+}
+
+/**
  * Common API error codes
  */
 export const API_ERROR_CODES = {

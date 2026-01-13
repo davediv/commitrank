@@ -9,9 +9,12 @@ import {
 	API_ERROR_CODES,
 	type UserProfile,
 	type PeriodContribution,
-	type ContributionPeriod
+	type ContributionPeriod,
+	type UpdateUserRequest
 } from '$lib/types';
-import { getCached, setCached, userKey, CACHE_TTL } from '$lib/server/cache';
+import { getCached, setCached, deleteCached, userKey, CACHE_TTL } from '$lib/server/cache';
+
+const TWITTER_HANDLE_REGEX = /^[a-zA-Z0-9_]{1,15}$/;
 
 const PERIODS: ContributionPeriod[] = ['today', '7days', '30days', 'year'];
 
@@ -151,6 +154,85 @@ export const GET: RequestHandler = async ({ params, platform }) => {
 		return json(createSuccessResponse(userProfile, { cached: false }));
 	} catch (error) {
 		console.error('User API error:', error);
+		return json(createErrorResponse(API_ERROR_CODES.INTERNAL_ERROR, 'An internal error occurred'), {
+			status: 500
+		});
+	}
+};
+
+export const PATCH: RequestHandler = async ({ params, request, platform }) => {
+	const { username } = params;
+
+	// Parse request body
+	let body: UpdateUserRequest;
+	try {
+		body = await request.json();
+	} catch {
+		return json(createErrorResponse(API_ERROR_CODES.INVALID_TWITTER, 'Invalid JSON body'), {
+			status: 400
+		});
+	}
+
+	const { twitter_handle } = body;
+
+	// Validate twitter_handle format if provided and not null
+	if (twitter_handle !== undefined && twitter_handle !== null && twitter_handle !== '') {
+		if (typeof twitter_handle !== 'string' || !TWITTER_HANDLE_REGEX.test(twitter_handle)) {
+			return json(
+				createErrorResponse(
+					API_ERROR_CODES.INVALID_TWITTER,
+					'Invalid Twitter handle format. Must be 1-15 characters, alphanumeric or underscore'
+				),
+				{ status: 400 }
+			);
+		}
+	}
+
+	try {
+		const db = createDb(platform!.env.DB);
+		const kv = platform!.env.KV;
+
+		// Check if user exists
+		const userResult = await db
+			.select({ id: users.id })
+			.from(users)
+			.where(eq(users.github_username, username))
+			.limit(1);
+
+		if (userResult.length === 0) {
+			return json(
+				createErrorResponse(API_ERROR_CODES.USER_NOT_FOUND, `User '${username}' not found`),
+				{ status: 404 }
+			);
+		}
+
+		// Update user
+		const updatedUsers = await db
+			.update(users)
+			.set({
+				twitter_handle: twitter_handle === '' ? null : twitter_handle,
+				updated_at: new Date().toISOString()
+			})
+			.where(eq(users.github_username, username))
+			.returning();
+
+		const updatedUser = updatedUsers[0];
+
+		// Invalidate user cache
+		await deleteCached(kv, userKey(username));
+
+		return json(
+			createSuccessResponse({
+				id: updatedUser.id,
+				github_username: updatedUser.github_username,
+				display_name: updatedUser.display_name,
+				avatar_url: updatedUser.avatar_url,
+				twitter_handle: updatedUser.twitter_handle,
+				updated_at: updatedUser.updated_at
+			})
+		);
+	} catch (error) {
+		console.error('User update error:', error);
 		return json(createErrorResponse(API_ERROR_CODES.INTERNAL_ERROR, 'An internal error occurred'), {
 			status: 500
 		});
