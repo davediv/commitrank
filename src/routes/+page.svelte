@@ -3,11 +3,11 @@
 	import { navigating, page } from '$app/stores';
 	import { resolve } from '$app/paths';
 	import { onMount } from 'svelte';
-	import { Trophy, Github, Twitter, Users, Activity, CheckCircle, X } from '@lucide/svelte';
+	import { Trophy, Github, Twitter, Users, Activity, CheckCircle } from '@lucide/svelte';
 	import * as Tabs from '$lib/components/ui/tabs';
 	import * as Table from '$lib/components/ui/table';
 	import * as Avatar from '$lib/components/ui/avatar';
-	import * as Alert from '$lib/components/ui/alert';
+	import * as Dialog from '$lib/components/ui/dialog';
 	import { Button } from '$lib/components/ui/button';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import type { PageData } from './$types';
@@ -37,6 +37,7 @@
 	// Success message from registration
 	let successMessage: { username: string; rank: number; contributions: number } | null =
 		$state(null);
+	let showSuccessModal = $state(false);
 
 	onMount(() => {
 		// Check for join_success cookie
@@ -46,6 +47,7 @@
 			if (name === 'join_success') {
 				try {
 					successMessage = JSON.parse(decodeURIComponent(value));
+					showSuccessModal = true;
 					// Clear the cookie
 					document.cookie = 'join_success=; path=/; max-age=0';
 				} catch {
@@ -57,7 +59,7 @@
 	});
 
 	function dismissSuccess() {
-		successMessage = null;
+		showSuccessModal = false;
 	}
 
 	function handlePeriodChange(period: string) {
@@ -71,13 +73,6 @@
 		const url = new URL($page.url);
 		url.searchParams.set('page', newPage.toString());
 		goto(url.toString(), { replaceState: true });
-	}
-
-	function getMedalEmoji(rank: number): string {
-		if (rank === 1) return '🥇';
-		if (rank === 2) return '🥈';
-		if (rank === 3) return '🥉';
-		return rank.toString();
 	}
 
 	function formatNumber(num: number): string {
@@ -126,26 +121,29 @@
 	</div>
 </noscript>
 
-<div class="container mx-auto px-4 py-8">
-	<!-- Success Alert -->
-	{#if successMessage}
-		<Alert.Root class="relative mb-6">
-			<CheckCircle class="h-4 w-4" />
-			<Alert.Title>Welcome to CommitRank!</Alert.Title>
-			<Alert.Description>
-				<strong>@{successMessage.username}</strong> has joined the leaderboard at rank #{successMessage.rank}
-				with {formatNumber(successMessage.contributions)} contributions this year.
-			</Alert.Description>
-			<button
-				onclick={dismissSuccess}
-				class="absolute top-2 right-2 rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-				aria-label="Dismiss"
-			>
-				<X class="h-4 w-4" />
-			</button>
-		</Alert.Root>
-	{/if}
+<!-- Success Modal -->
+{#if successMessage}
+	<Dialog.Root bind:open={showSuccessModal} onOpenChange={dismissSuccess}>
+		<Dialog.Content class="sm:max-w-md">
+			<Dialog.Header>
+				<Dialog.Title class="flex items-center gap-2">
+					<CheckCircle class="h-5 w-5 text-green-500" />
+					Welcome to CommitRank!
+				</Dialog.Title>
+				<Dialog.Description>
+					<strong>@{successMessage.username}</strong> has joined the leaderboard at rank
+					<strong>#{successMessage.rank}</strong>
+					with <strong>{formatNumber(successMessage.contributions)}</strong> contributions this year.
+				</Dialog.Description>
+			</Dialog.Header>
+			<Dialog.Footer>
+				<Button onclick={dismissSuccess}>View Leaderboard</Button>
+			</Dialog.Footer>
+		</Dialog.Content>
+	</Dialog.Root>
+{/if}
 
+<div class="mx-auto max-w-2xl px-4 py-8">
 	<!-- Header Section -->
 	<div class="mb-8 text-center">
 		<div class="mb-4 flex items-center justify-center gap-3">
@@ -230,11 +228,7 @@
 					{#each data.leaderboard.leaderboard as entry (entry.github_username)}
 						<Table.Row>
 							<Table.Cell class="text-center font-medium">
-								{#if entry.rank <= 3}
-									<span class="text-xl">{getMedalEmoji(entry.rank)}</span>
-								{:else}
-									{entry.rank}
-								{/if}
+								{entry.rank}
 							</Table.Cell>
 							<Table.Cell>
 								<div class="flex items-center gap-3">
