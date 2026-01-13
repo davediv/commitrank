@@ -1,0 +1,36 @@
+node_modules
+docs
+
+# Output
+.output
+.vercel
+.netlify
+.wrangler
+/.svelte-kit
+/build
+.claude
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.*
+!.env.example
+!.env.test
+
+# Vite
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
+
+# Cloudflare Types
+/worker-configuration.d.ts
+
+# SQLite
+*.db
+
+.dev.vars*
+!.dev.vars.example
+
+CLAUDE.md
