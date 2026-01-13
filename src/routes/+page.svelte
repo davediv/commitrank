@@ -2,10 +2,12 @@
 	import { goto } from '$app/navigation';
 	import { navigating, page } from '$app/stores';
 	import { resolve } from '$app/paths';
-	import { Trophy, Github, Twitter, Users, Activity } from '@lucide/svelte';
+	import { onMount } from 'svelte';
+	import { Trophy, Github, Twitter, Users, Activity, CheckCircle, X } from '@lucide/svelte';
 	import * as Tabs from '$lib/components/ui/tabs';
 	import * as Table from '$lib/components/ui/table';
 	import * as Avatar from '$lib/components/ui/avatar';
+	import * as Alert from '$lib/components/ui/alert';
 	import { Button } from '$lib/components/ui/button';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import type { PageData } from './$types';
@@ -21,6 +23,32 @@
 
 	// Number of skeleton rows to show
 	const SKELETON_ROWS = 10;
+
+	// Success message from registration
+	let successMessage: { username: string; rank: number; contributions: number } | null =
+		$state(null);
+
+	onMount(() => {
+		// Check for join_success cookie
+		const cookies = document.cookie.split(';');
+		for (const cookie of cookies) {
+			const [name, value] = cookie.trim().split('=');
+			if (name === 'join_success') {
+				try {
+					successMessage = JSON.parse(decodeURIComponent(value));
+					// Clear the cookie
+					document.cookie = 'join_success=; path=/; max-age=0';
+				} catch {
+					// Ignore parse errors
+				}
+				break;
+			}
+		}
+	});
+
+	function dismissSuccess() {
+		successMessage = null;
+	}
 
 	function handlePeriodChange(period: string) {
 		const url = new URL($page.url);
@@ -54,6 +82,25 @@
 </script>
 
 <div class="container mx-auto px-4 py-8">
+	<!-- Success Alert -->
+	{#if successMessage}
+		<Alert.Root class="relative mb-6">
+			<CheckCircle class="h-4 w-4" />
+			<Alert.Title>Welcome to CommitRank!</Alert.Title>
+			<Alert.Description>
+				<strong>@{successMessage.username}</strong> has joined the leaderboard at rank #{successMessage.rank}
+				with {formatNumber(successMessage.contributions)} contributions this year.
+			</Alert.Description>
+			<button
+				onclick={dismissSuccess}
+				class="absolute top-2 right-2 rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+				aria-label="Dismiss"
+			>
+				<X class="h-4 w-4" />
+			</button>
+		</Alert.Root>
+	{/if}
+
 	<!-- Header Section -->
 	<div class="mb-8 text-center">
 		<div class="mb-4 flex items-center justify-center gap-3">
