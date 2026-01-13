@@ -78,9 +78,9 @@ export async function checkRateLimit(
  * Rate limit configuration presets
  */
 export const RATE_LIMITS = {
-	/** POST /api/users - 5 requests per hour */
+	/** POST /api/users - 60 requests per hour */
 	REGISTER: {
-		limit: 5,
+		limit: 60,
 		windowSeconds: 3600
 	},
 	/** GET /api/leaderboard - 100 requests per minute */
