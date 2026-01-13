@@ -1,4 +1,4 @@
-import { fail, redirect } from '@sveltejs/kit';
+import { fail, redirect, isRedirect } from '@sveltejs/kit';
 import type { Actions } from './$types';
 import { createDb } from '$lib/server/db';
 import { users, contributions } from '$lib/server/db/schema';
@@ -133,6 +133,8 @@ export const actions: Actions = {
 			const insertedUser = newUser[0];
 
 			// Insert contribution data for each day
+			// Cloudflare D1 local dev has very strict SQL variable limits
+			// Insert rows one at a time to avoid any variable limit issues
 			if (githubData.contributions.days.length > 0) {
 				const contributionValues = githubData.contributions.days
 					.filter((day) => day.contributionCount > 0)
@@ -146,8 +148,9 @@ export const actions: Actions = {
 						total_contributions: day.contributionCount
 					}));
 
-				if (contributionValues.length > 0) {
-					await db.insert(contributions).values(contributionValues);
+				// Insert one at a time to avoid D1 variable limits
+				for (const contrib of contributionValues) {
+					await db.insert(contributions).values(contrib);
 				}
 			}
 
@@ -175,6 +178,11 @@ export const actions: Actions = {
 			// Redirect to homepage with success
 			redirect(303, '/');
 		} catch (error) {
+			// Re-throw redirects - they're not errors, they're control flow
+			if (isRedirect(error)) {
+				throw error;
+			}
+
 			if (error instanceof GitHubApiError) {
 				if (error.type === 'NOT_FOUND') {
 					return fail(404, {
