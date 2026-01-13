@@ -83,9 +83,13 @@
 		return new Intl.NumberFormat().format(num);
 	}
 
-	function getAvatarUrl(url: string | null, size: number = 48): string {
+	/**
+	 * Get optimized GitHub avatar URL with proper sizing
+	 * Uses 2x size for retina displays when avatar is displayed at 32px (h-8 w-8)
+	 */
+	function getAvatarUrl(url: string | null, size: number = 64): string {
 		if (!url) return '';
-		// GitHub avatar URL with size parameter
+		// GitHub avatar URL with size parameter (2x for retina: 64px for 32px display)
 		return url.includes('?') ? `${url}&s=${size}` : `${url}?s=${size}`;
 	}
 </script>
@@ -238,6 +242,9 @@
 											src={getAvatarUrl(entry.avatar_url)}
 											alt={entry.github_username}
 											loading="lazy"
+											decoding="async"
+											width={32}
+											height={32}
 										/>
 										<Avatar.Fallback>
 											{entry.github_username.slice(0, 2).toUpperCase()}
