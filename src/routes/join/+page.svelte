@@ -14,10 +14,20 @@
 
 	let { form }: Props = $props();
 
-	// Form state
+	// Form state - use $derived for initial values from form props to be reactive
 	let isSubmitting = $state(false);
-	let github_username = $state(form?.github_username ?? '');
-	let twitter_handle = $state(form?.twitter_handle ?? '');
+	let github_username = $state('');
+	let twitter_handle = $state('');
+
+	// Sync form values when form prop changes (e.g., after server validation error)
+	$effect(() => {
+		if (form?.github_username !== undefined) {
+			github_username = form.github_username ?? '';
+		}
+		if (form?.twitter_handle !== undefined) {
+			twitter_handle = form.twitter_handle ?? '';
+		}
+	});
 
 	// Client-side validation errors
 	let githubError = $state('');

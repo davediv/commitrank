@@ -25,7 +25,8 @@
 		'30days': 'this month',
 		year: 'this year'
 	};
-	const periodLabel = periodLabels[data.period] || 'today';
+	// Use $derived to make periodLabel reactive to data.period changes
+	const periodLabel = $derived(periodLabels[data.period] || 'today');
 
 	// Show loading state during navigation
 	let isLoading = $derived(!!$navigating);
