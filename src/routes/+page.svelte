@@ -1,12 +1,13 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { page } from '$app/stores';
+	import { navigating, page } from '$app/stores';
 	import { resolve } from '$app/paths';
 	import { Trophy, Github, Twitter, Users, Activity } from '@lucide/svelte';
 	import * as Tabs from '$lib/components/ui/tabs';
 	import * as Table from '$lib/components/ui/table';
 	import * as Avatar from '$lib/components/ui/avatar';
 	import { Button } from '$lib/components/ui/button';
+	import { Skeleton } from '$lib/components/ui/skeleton';
 	import type { PageData } from './$types';
 
 	interface Props {
@@ -14,6 +15,12 @@
 	}
 
 	let { data }: Props = $props();
+
+	// Show loading state during navigation
+	let isLoading = $derived(!!$navigating);
+
+	// Number of skeleton rows to show
+	const SKELETON_ROWS = 10;
 
 	function handlePeriodChange(period: string) {
 		const url = new URL($page.url);
@@ -96,7 +103,31 @@
 				</Table.Row>
 			</Table.Header>
 			<Table.Body>
-				{#if data.leaderboard.leaderboard.length === 0}
+				{#if isLoading}
+					<!-- Loading skeleton -->
+					{#each Array.from({ length: SKELETON_ROWS }, (_, i) => i) as i (i)}
+						<Table.Row>
+							<Table.Cell class="text-center">
+								<Skeleton class="mx-auto h-5 w-5" />
+							</Table.Cell>
+							<Table.Cell>
+								<div class="flex items-center gap-3">
+									<Skeleton class="h-8 w-8 rounded-full" />
+									<div class="flex flex-col gap-1">
+										<Skeleton class="h-4 w-24" />
+										<Skeleton class="h-3 w-16" />
+									</div>
+								</div>
+							</Table.Cell>
+							<Table.Cell class="text-right">
+								<Skeleton class="ml-auto h-4 w-12" />
+							</Table.Cell>
+							<Table.Cell class="hidden text-right sm:table-cell">
+								<Skeleton class="ml-auto h-4 w-20" />
+							</Table.Cell>
+						</Table.Row>
+					{/each}
+				{:else if data.leaderboard.leaderboard.length === 0}
 					<Table.Row>
 						<Table.Cell colspan={4} class="py-12 text-center text-muted-foreground">
 							No developers on the leaderboard yet. Be the first to
