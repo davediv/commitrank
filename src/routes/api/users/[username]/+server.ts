@@ -13,6 +13,7 @@ import {
 	type UpdateUserRequest
 } from '$lib/types';
 import { getCached, setCached, deleteCached, userKey, CACHE_TTL } from '$lib/server/cache';
+import { checkRateLimit, rateLimitKey, RATE_LIMITS } from '$lib/server/ratelimit';
 
 const TWITTER_HANDLE_REGEX = /^[a-zA-Z0-9_]{1,15}$/;
 
@@ -160,8 +161,36 @@ export const GET: RequestHandler = async ({ params, platform }) => {
 	}
 };
 
-export const PATCH: RequestHandler = async ({ params, request, platform }) => {
+export const PATCH: RequestHandler = async ({ params, request, platform, getClientAddress }) => {
 	const { username } = params;
+
+	// Rate limit check
+	const kv = platform!.env.KV;
+	const clientIp = getClientAddress();
+	const rateLimitResult = await checkRateLimit(
+		kv,
+		rateLimitKey(clientIp, 'update_user'),
+		RATE_LIMITS.UPDATE_USER.limit,
+		RATE_LIMITS.UPDATE_USER.windowSeconds
+	);
+
+	if (!rateLimitResult.allowed) {
+		return json(
+			createErrorResponse(
+				API_ERROR_CODES.RATE_LIMITED,
+				`Rate limit exceeded. Try again in ${Math.ceil(rateLimitResult.resetIn / 60)} minutes.`
+			),
+			{
+				status: 429,
+				headers: {
+					'Retry-After': rateLimitResult.resetIn.toString(),
+					'X-RateLimit-Limit': RATE_LIMITS.UPDATE_USER.limit.toString(),
+					'X-RateLimit-Remaining': '0',
+					'X-RateLimit-Reset': Math.ceil(Date.now() / 1000 + rateLimitResult.resetIn).toString()
+				}
+			}
+		);
+	}
 
 	// Parse request body
 	let body: UpdateUserRequest;
@@ -190,7 +219,6 @@ export const PATCH: RequestHandler = async ({ params, request, platform }) => {
 
 	try {
 		const db = createDb(platform!.env.DB);
-		const kv = platform!.env.KV;
 
 		// Check if user exists
 		const userResult = await db

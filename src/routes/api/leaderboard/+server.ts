@@ -12,6 +12,7 @@ import {
 	type LeaderboardResponse
 } from '$lib/types';
 import { getCached, setCached, leaderboardKey, CACHE_TTL } from '$lib/server/cache';
+import { checkRateLimit, rateLimitKey, RATE_LIMITS } from '$lib/server/ratelimit';
 
 const VALID_PERIODS: ContributionPeriod[] = ['today', '7days', '30days', 'year'];
 const MAX_LIMIT = 100;
@@ -47,7 +48,35 @@ function getDateRange(period: ContributionPeriod): { startDate: string; endDate:
 	return { startDate, endDate };
 }
 
-export const GET: RequestHandler = async ({ url, platform }) => {
+export const GET: RequestHandler = async ({ url, platform, getClientAddress }) => {
+	// Rate limit check
+	const kv = platform!.env.KV;
+	const clientIp = getClientAddress();
+	const rateLimitResult = await checkRateLimit(
+		kv,
+		rateLimitKey(clientIp, 'leaderboard'),
+		RATE_LIMITS.LEADERBOARD.limit,
+		RATE_LIMITS.LEADERBOARD.windowSeconds
+	);
+
+	if (!rateLimitResult.allowed) {
+		return json(
+			createErrorResponse(
+				API_ERROR_CODES.RATE_LIMITED,
+				`Rate limit exceeded. Try again in ${rateLimitResult.resetIn} seconds.`
+			),
+			{
+				status: 429,
+				headers: {
+					'Retry-After': rateLimitResult.resetIn.toString(),
+					'X-RateLimit-Limit': RATE_LIMITS.LEADERBOARD.limit.toString(),
+					'X-RateLimit-Remaining': '0',
+					'X-RateLimit-Reset': Math.ceil(Date.now() / 1000 + rateLimitResult.resetIn).toString()
+				}
+			}
+		);
+	}
+
 	// Parse query parameters
 	const periodParam = url.searchParams.get('period') || 'today';
 	const pageParam = url.searchParams.get('page');
@@ -86,7 +115,6 @@ export const GET: RequestHandler = async ({ url, platform }) => {
 	limit = Math.min(limit, MAX_LIMIT);
 
 	try {
-		const kv = platform!.env.KV;
 		const cacheKey = leaderboardKey(period, page, limit);
 
 		// Check cache first
