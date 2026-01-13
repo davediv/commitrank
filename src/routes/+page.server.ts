@@ -90,6 +90,7 @@ export const load: PageServerLoad = async ({ url, platform, setHeaders }) => {
 
 		try {
 			// Query for leaderboard with aggregated contributions
+			// Only show users who have contributions in the selected period
 			const leaderboardQuery = db
 				.select({
 					github_username: users.github_username,
@@ -101,7 +102,7 @@ export const load: PageServerLoad = async ({ url, platform, setHeaders }) => {
 					)
 				})
 				.from(users)
-				.leftJoin(
+				.innerJoin(
 					contributions,
 					and(
 						eq(contributions.user_id, users.id),
@@ -110,12 +111,23 @@ export const load: PageServerLoad = async ({ url, platform, setHeaders }) => {
 					)
 				)
 				.groupBy(users.id)
+				.having(sql`total > 0`)
 				.orderBy(desc(sql`total`))
 				.limit(limit)
 				.offset(offset);
 
-			// Query for total count
-			const countQuery = db.select({ count: sql<number>`COUNT(*)` }).from(users);
+			// Query for total count of users with contributions in period
+			const countQuery = db
+				.select({ count: sql<number>`COUNT(DISTINCT ${users.id})` })
+				.from(users)
+				.innerJoin(
+					contributions,
+					and(
+						eq(contributions.user_id, users.id),
+						gte(contributions.date, startDate),
+						sql`${contributions.date} <= ${endDate}`
+					)
+				);
 
 			// Execute both queries
 			const [leaderboardRows, countResult] = await Promise.all([leaderboardQuery, countQuery]);
