@@ -551,7 +551,7 @@ This document outlines the development tasks for **CommitRank**, a web applicati
     - No full table scans for common operations
   - **Dependencies**: DB-P1-003, API-P2-002
 
-- [ ] 🟡 **PERF-P3-002**: Implement SSR optimization for leaderboard page
+- [x] 🟡 **PERF-P3-002**: Implement SSR optimization for leaderboard page
   - **Success Criteria**:
     - Page renders entirely on server (no client fetch on initial load)
     - Time to First Byte (TTFB) < 100ms from edge
