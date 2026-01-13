@@ -11,6 +11,7 @@ import {
 	type PeriodContribution,
 	type ContributionPeriod
 } from '$lib/types';
+import { getCached, setCached, userKey, CACHE_TTL } from '$lib/server/cache';
 
 const PERIODS: ContributionPeriod[] = ['today', '7days', '30days', 'year'];
 
@@ -46,6 +47,16 @@ export const GET: RequestHandler = async ({ params, platform }) => {
 	const { username } = params;
 
 	try {
+		const kv = platform!.env.KV;
+		const cacheKey = userKey(username);
+
+		// Check cache first
+		const cachedProfile = await getCached<UserProfile>(kv, cacheKey);
+		if (cachedProfile) {
+			return json(createSuccessResponse(cachedProfile, { cached: true }));
+		}
+
+		// Cache miss - query database
 		const db = createDb(platform!.env.DB);
 
 		// Fetch user by username
@@ -134,7 +145,10 @@ export const GET: RequestHandler = async ({ params, platform }) => {
 			contributions: periodContributions
 		};
 
-		return json(createSuccessResponse(userProfile));
+		// Cache the response
+		await setCached(kv, cacheKey, userProfile, CACHE_TTL.USER);
+
+		return json(createSuccessResponse(userProfile, { cached: false }));
 	} catch (error) {
 		console.error('User API error:', error);
 		return json(createErrorResponse(API_ERROR_CODES.INTERNAL_ERROR, 'An internal error occurred'), {
