@@ -9,27 +9,10 @@ import {
 	API_ERROR_CODES,
 	type CreateUserRequest
 } from '$lib/types';
+import { isValidGitHubUsername, isValidTwitterHandle } from '$lib/validation';
 import { fetchContributions, parseGitHubNodeId, GitHubApiError } from '$lib/server/github';
 import { invalidateLeaderboardCache, deleteCached, statsKey } from '$lib/server/cache';
 import { checkRateLimit, rateLimitKey, RATE_LIMITS } from '$lib/server/ratelimit';
-
-// Validation patterns
-const GITHUB_USERNAME_REGEX = /^[a-zA-Z0-9](?:[a-zA-Z0-9]|-(?=[a-zA-Z0-9])){0,38}$/;
-const TWITTER_HANDLE_REGEX = /^[a-zA-Z0-9_]{1,15}$/;
-
-/**
- * Validate GitHub username format
- */
-function isValidGitHubUsername(username: string): boolean {
-	return GITHUB_USERNAME_REGEX.test(username);
-}
-
-/**
- * Validate Twitter handle format
- */
-function isValidTwitterHandle(handle: string): boolean {
-	return TWITTER_HANDLE_REGEX.test(handle);
-}
 
 /**
  * Calculate user's rank based on total contributions

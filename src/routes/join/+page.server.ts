@@ -4,21 +4,10 @@ import { createDb } from '$lib/server/db';
 import { users, contributions } from '$lib/server/db/schema';
 import { eq, sql, desc, and } from 'drizzle-orm';
 import { API_ERROR_CODES } from '$lib/types';
+import { isValidGitHubUsername, isValidTwitterHandle } from '$lib/validation';
 import { fetchContributions, parseGitHubNodeId, GitHubApiError } from '$lib/server/github';
 import { invalidateLeaderboardCache, deleteCached, statsKey } from '$lib/server/cache';
 import { checkRateLimit, rateLimitKey, RATE_LIMITS } from '$lib/server/ratelimit';
-
-// Validation patterns
-const GITHUB_USERNAME_REGEX = /^[a-zA-Z0-9](?:[a-zA-Z0-9]|-(?=[a-zA-Z0-9])){0,38}$/;
-const TWITTER_HANDLE_REGEX = /^[a-zA-Z0-9_]{1,15}$/;
-
-function isValidGitHubUsername(username: string): boolean {
-	return GITHUB_USERNAME_REGEX.test(username);
-}
-
-function isValidTwitterHandle(handle: string): boolean {
-	return TWITTER_HANDLE_REGEX.test(handle);
-}
 
 async function calculateUserRank(db: ReturnType<typeof createDb>, userId: string): Promise<number> {
 	const now = new Date();
