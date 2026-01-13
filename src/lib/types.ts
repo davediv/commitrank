@@ -147,6 +147,22 @@ export interface UpdateUserRequest {
 }
 
 /**
+ * Stats response data
+ */
+export interface StatsResponse {
+	/** Total number of registered users */
+	total_users: number;
+	/** Total contributions today across all users */
+	total_contributions_today: number;
+	/** Total contributions in the past year across all users */
+	total_contributions_year: number;
+	/** Last sync timestamp (when contributions were last updated) */
+	last_sync: string | null;
+	/** Next scheduled sync timestamp */
+	next_sync: string;
+}
+
+/**
  * Common API error codes
  */
 export const API_ERROR_CODES = {
