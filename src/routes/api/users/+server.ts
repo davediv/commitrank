@@ -11,6 +11,7 @@ import {
 } from '$lib/types';
 import { fetchContributions, parseGitHubNodeId, GitHubApiError } from '$lib/server/github';
 import { invalidateLeaderboardCache, deleteCached, statsKey } from '$lib/server/cache';
+import { checkRateLimit, rateLimitKey, RATE_LIMITS } from '$lib/server/ratelimit';
 
 // Validation patterns
 const GITHUB_USERNAME_REGEX = /^[a-zA-Z0-9](?:[a-zA-Z0-9]|-(?=[a-zA-Z0-9])){0,38}$/;
@@ -55,7 +56,35 @@ async function calculateUserRank(db: ReturnType<typeof createDb>, userId: string
 	return rank || 0;
 }
 
-export const POST: RequestHandler = async ({ request, platform }) => {
+export const POST: RequestHandler = async ({ request, platform, getClientAddress }) => {
+	// Rate limit check - before any processing
+	const kv = platform!.env.KV;
+	const clientIp = getClientAddress();
+	const rateLimitResult = await checkRateLimit(
+		kv,
+		rateLimitKey(clientIp, 'register'),
+		RATE_LIMITS.REGISTER.limit,
+		RATE_LIMITS.REGISTER.windowSeconds
+	);
+
+	if (!rateLimitResult.allowed) {
+		return json(
+			createErrorResponse(
+				API_ERROR_CODES.RATE_LIMITED,
+				`Rate limit exceeded. Try again in ${Math.ceil(rateLimitResult.resetIn / 60)} minutes.`
+			),
+			{
+				status: 429,
+				headers: {
+					'Retry-After': rateLimitResult.resetIn.toString(),
+					'X-RateLimit-Limit': RATE_LIMITS.REGISTER.limit.toString(),
+					'X-RateLimit-Remaining': '0',
+					'X-RateLimit-Reset': Math.ceil(Date.now() / 1000 + rateLimitResult.resetIn).toString()
+				}
+			}
+		);
+	}
+
 	// Parse request body
 	let body: CreateUserRequest;
 	try {
@@ -172,7 +201,6 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 		const rank = await calculateUserRank(db, insertedUser.id);
 
 		// Invalidate cache after successful registration
-		const kv = platform!.env.KV;
 		await Promise.all([invalidateLeaderboardCache(kv), deleteCached(kv, statsKey())]);
 
 		return json(
