@@ -184,10 +184,11 @@ export const actions: Actions = {
 				});
 
 				if (contributionValues.length > 0) {
-					// Production D1 supports up to 999 variables per statement
-					// Local D1 dev (miniflare) has stricter limits (~80 vars max)
-					// With 8 columns per row: production=100 rows (800 vars), dev=10 rows (80 vars)
-					const CHUNK_SIZE = isProduction ? 100 : 10;
+					// D1 has practical limits beyond the documented 999 parameter limit
+					// Using conservative chunk sizes to avoid query complexity issues
+					// Production: 50 rows (400 params), Dev: 10 rows (80 params)
+					const CHUNK_SIZE = isProduction ? 50 : 10;
+					const MAX_RETRIES = 3;
 					const totalChunks = Math.ceil(contributionValues.length / CHUNK_SIZE);
 
 					log.info('Starting chunked contribution inserts', {
@@ -207,16 +208,41 @@ export const actions: Actions = {
 							startIndex: i
 						});
 
-						try {
-							await db.insert(contributions).values(chunk);
-							log.debug(`Chunk ${chunkIndex}/${totalChunks} inserted successfully`);
-						} catch (chunkError) {
-							log.error(`Chunk ${chunkIndex}/${totalChunks} insert failed`, {
-								chunkSize: chunk.length,
-								startIndex: i,
-								error: chunkError instanceof Error ? chunkError.message : String(chunkError)
-							});
-							throw chunkError;
+						// Retry logic for transient D1 failures
+						let lastError: unknown;
+						for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+							try {
+								await db.insert(contributions).values(chunk);
+								log.debug(`Chunk ${chunkIndex}/${totalChunks} inserted successfully`);
+								lastError = null;
+								break;
+							} catch (chunkError) {
+								lastError = chunkError;
+								const errorMsg =
+									chunkError instanceof Error ? chunkError.message : String(chunkError);
+
+								if (attempt < MAX_RETRIES) {
+									log.warn(
+										`Chunk ${chunkIndex}/${totalChunks} attempt ${attempt} failed, retrying...`,
+										{ error: errorMsg }
+									);
+									// Exponential backoff: 100ms, 200ms, 400ms
+									await new Promise((r) => setTimeout(r, 100 * Math.pow(2, attempt - 1)));
+								} else {
+									log.error(
+										`Chunk ${chunkIndex}/${totalChunks} failed after ${MAX_RETRIES} attempts`,
+										{
+											chunkSize: chunk.length,
+											startIndex: i,
+											error: errorMsg
+										}
+									);
+								}
+							}
+						}
+
+						if (lastError) {
+							throw lastError;
 						}
 					}
 					log.timeEnd('insert-contributions-total');
