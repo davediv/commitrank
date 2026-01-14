@@ -150,9 +150,11 @@ export const actions: Actions = {
 					}));
 
 				if (contributionValues.length > 0) {
-					// Use multi-row inserts with 100 rows per query (700 variables, well under 999 limit)
-					// Each insert is a single network call, but inserts 100 rows at once
-					const CHUNK_SIZE = 100;
+					// Production D1 supports up to 999 variables per statement
+					// Local D1 dev (miniflare) has stricter limits (~80 vars max)
+					// With 8 columns per row: production=100 rows (800 vars), dev=10 rows (80 vars)
+					const isProduction = platform?.env?.ENVIRONMENT === 'production';
+					const CHUNK_SIZE = isProduction ? 100 : 10;
 
 					for (let i = 0; i < contributionValues.length; i += CHUNK_SIZE) {
 						const chunk = contributionValues.slice(i, i + CHUNK_SIZE);
