@@ -184,10 +184,9 @@ export const actions: Actions = {
 				});
 
 				if (contributionValues.length > 0) {
-					// D1 has practical limits beyond the documented 999 parameter limit
-					// Using conservative chunk sizes to avoid query complexity issues
-					// Production: 50 rows (400 params), Dev: 10 rows (80 params)
-					const CHUNK_SIZE = isProduction ? 50 : 10;
+					// D1 limit: Maximum 100 bound parameters per query
+					// Each row has 8 parameters, so max 12 rows per query (12 × 8 = 96 params)
+					const CHUNK_SIZE = 12;
 					const MAX_RETRIES = 3;
 					const totalChunks = Math.ceil(contributionValues.length / CHUNK_SIZE);
 
