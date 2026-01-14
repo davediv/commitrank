@@ -165,7 +165,6 @@
 	<!-- Header Section -->
 	<div class="mb-8 text-center">
 		<div class="mb-4 flex items-center justify-center gap-3">
-			<Trophy class="h-10 w-10 text-yellow-500" />
 			<h1 class="text-3xl font-bold tracking-tight sm:text-4xl">Commit Rank</h1>
 		</div>
 		<p class="text-muted-foreground">GitHub Commit Leaderboard</p>
