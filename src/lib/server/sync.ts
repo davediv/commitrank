@@ -31,7 +31,9 @@ interface SyncResult {
  * Summary of the sync job
  */
 interface SyncSummary {
-	totalUsers: number;
+	totalUsersInDb: number;
+	batchSize: number;
+	syncedCount: number;
 	successCount: number;
 	failureCount: number;
 	results: SyncResult[];
@@ -43,6 +45,13 @@ interface SyncSummary {
  * GitHub allows 5,000 requests/hour with auth, but we're conservative
  */
 const REQUEST_DELAY_MS = 100;
+
+/**
+ * Maximum number of users to sync per cron run
+ * With 4 cron runs/day (every 6 hours), this allows ~1000 users/day
+ * This prevents Worker CPU timeout (30s limit) on large user bases
+ */
+const BATCH_SIZE = 250;
 
 /**
  * Sync contributions for a single user
@@ -152,8 +161,12 @@ function sleep(ms: number): Promise<void> {
 /**
  * Run the scheduled sync job
  *
- * Fetches all users ordered by updated_at ASC (oldest first)
- * and syncs their contribution data from GitHub.
+ * Fetches users ordered by updated_at ASC (oldest first) and syncs
+ * their contribution data from GitHub. Uses batching to prevent
+ * Worker CPU timeout on large user bases.
+ *
+ * The updated_at timestamp is updated after each sync, so users
+ * naturally rotate through the queue across multiple cron runs.
  *
  * @param db - D1 Database binding
  * @param kv - KV Namespace binding
@@ -168,22 +181,30 @@ export async function runScheduledSync(
 	const startTime = Date.now();
 	const db = createDb(dbBinding);
 
-	// Fetch all users ordered by least recently updated
-	const allUsers = await db
+	// Count total users in database
+	const countResult = await db.select({ count: users.id }).from(users);
+	const totalUsersInDb = countResult.length;
+
+	// Fetch batch of users ordered by least recently updated
+	const usersToSync = await db
 		.select({
 			id: users.id,
 			github_username: users.github_username
 		})
 		.from(users)
-		.orderBy(asc(users.updated_at));
+		.orderBy(asc(users.updated_at))
+		.limit(BATCH_SIZE);
 
 	const results: SyncResult[] = [];
 	let successCount = 0;
 	let failureCount = 0;
 
-	console.log(`[Sync] Starting sync for ${allUsers.length} users`);
+	console.log(
+		`[Sync] Starting batched sync: ${usersToSync.length}/${totalUsersInDb} users (batch size: ${BATCH_SIZE})`
+	);
 
-	for (const user of allUsers) {
+	for (let i = 0; i < usersToSync.length; i++) {
+		const user = usersToSync[i];
 		const result = await syncUserContributions(db, user.id, user.github_username, token);
 
 		if (result.success) {
@@ -197,7 +218,7 @@ export async function runScheduledSync(
 		results.push(result);
 
 		// Delay between requests to respect rate limits
-		if (allUsers.indexOf(user) < allUsers.length - 1) {
+		if (i < usersToSync.length - 1) {
 			await sleep(REQUEST_DELAY_MS);
 		}
 	}
@@ -214,11 +235,13 @@ export async function runScheduledSync(
 	const durationMs = Date.now() - startTime;
 
 	console.log(
-		`[Sync] Completed in ${Math.round(durationMs / 1000)}s: ${successCount} success, ${failureCount} failed`
+		`[Sync] Completed in ${Math.round(durationMs / 1000)}s: ${successCount}/${usersToSync.length} success, ${failureCount} failed (${totalUsersInDb} total users)`
 	);
 
 	return {
-		totalUsers: allUsers.length,
+		totalUsersInDb,
+		batchSize: BATCH_SIZE,
+		syncedCount: usersToSync.length,
 		successCount,
 		failureCount,
 		results,

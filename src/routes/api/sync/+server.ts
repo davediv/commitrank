@@ -1,8 +1,9 @@
 /**
  * Internal API endpoint for scheduled sync
  *
- * This endpoint triggers the sync of all user contributions.
+ * This endpoint triggers the batched sync of user contributions.
  * It's designed to be called by Cloudflare Cron Triggers or an external cron service.
+ * Uses batching to prevent Worker CPU timeout on large user bases.
  *
  * Security: Protected by CRON_SECRET environment variable.
  */
@@ -14,7 +15,7 @@ import { runScheduledSync } from '$lib/server/sync';
 /**
  * GET /api/sync
  *
- * Triggers the scheduled sync for all users.
+ * Triggers the batched sync for users (oldest updated first).
  * Requires Authorization header with Bearer token matching CRON_SECRET.
  *
  * Can also be triggered by Cloudflare Workers scheduled event via /__scheduled route.
@@ -54,13 +55,15 @@ export const GET: RequestHandler = async ({ request, platform }) => {
 		const summary = await runScheduledSync(db, kv, githubToken);
 
 		console.log(
-			`[Sync API] Sync completed: ${summary.successCount}/${summary.totalUsers} succeeded in ${Math.round(summary.durationMs / 1000)}s`
+			`[Sync API] Sync completed: ${summary.successCount}/${summary.syncedCount} succeeded in ${Math.round(summary.durationMs / 1000)}s (${summary.totalUsersInDb} total users)`
 		);
 
 		return json({
 			success: true,
 			summary: {
-				totalUsers: summary.totalUsers,
+				totalUsersInDb: summary.totalUsersInDb,
+				batchSize: summary.batchSize,
+				syncedCount: summary.syncedCount,
 				successCount: summary.successCount,
 				failureCount: summary.failureCount,
 				durationMs: summary.durationMs
