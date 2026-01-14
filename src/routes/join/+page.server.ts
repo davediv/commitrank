@@ -8,6 +8,7 @@ import { isValidGitHubUsername, isValidTwitterHandle } from '$lib/validation';
 import { fetchContributions, parseGitHubNodeId, GitHubApiError } from '$lib/server/github';
 import { invalidateLeaderboardCache, deleteCached, statsKey } from '$lib/server/cache';
 import { checkRateLimit, rateLimitKey, RATE_LIMITS } from '$lib/server/ratelimit';
+import { createLogger } from '$lib/server/logger';
 
 async function calculateUserRank(db: ReturnType<typeof createDb>, userId: string): Promise<number> {
 	const now = new Date();
@@ -32,7 +33,11 @@ async function calculateUserRank(db: ReturnType<typeof createDb>, userId: string
 
 export const actions: Actions = {
 	default: async ({ request, platform, getClientAddress, cookies }) => {
+		const log = createLogger('Join');
+		log.info('Registration request received');
+
 		// Rate limit check
+		log.time('rate-limit-check');
 		const kv = platform!.env.KV;
 		const clientIp = getClientAddress();
 		const rateLimitResult = await checkRateLimit(
@@ -41,8 +46,10 @@ export const actions: Actions = {
 			RATE_LIMITS.REGISTER.limit,
 			RATE_LIMITS.REGISTER.windowSeconds
 		);
+		log.timeEnd('rate-limit-check');
 
 		if (!rateLimitResult.allowed) {
+			log.warn('Rate limit exceeded', { clientIp, resetIn: rateLimitResult.resetIn });
 			return fail(429, {
 				error: API_ERROR_CODES.RATE_LIMITED,
 				message: `Rate limit exceeded. Try again in ${Math.ceil(rateLimitResult.resetIn / 60)} minutes.`
@@ -53,9 +60,11 @@ export const actions: Actions = {
 		const formData = await request.formData();
 		const github_username = formData.get('github_username')?.toString().trim() || '';
 		const twitter_handle = formData.get('twitter_handle')?.toString().trim() || '';
+		log.info('Form data parsed', { github_username, twitter_handle: twitter_handle || '(none)' });
 
 		// Validate github_username is present
 		if (!github_username) {
+			log.warn('Validation failed: empty username');
 			return fail(400, {
 				error: API_ERROR_CODES.INVALID_USERNAME,
 				message: 'GitHub username is required',
@@ -66,6 +75,7 @@ export const actions: Actions = {
 
 		// Validate github_username format
 		if (!isValidGitHubUsername(github_username)) {
+			log.warn('Validation failed: invalid username format', { github_username });
 			return fail(400, {
 				error: API_ERROR_CODES.INVALID_USERNAME,
 				message:
@@ -77,6 +87,7 @@ export const actions: Actions = {
 
 		// Validate twitter_handle format if provided
 		if (twitter_handle && !isValidTwitterHandle(twitter_handle)) {
+			log.warn('Validation failed: invalid twitter handle', { twitter_handle });
 			return fail(400, {
 				error: API_ERROR_CODES.INVALID_TWITTER,
 				message:
@@ -88,15 +99,20 @@ export const actions: Actions = {
 
 		const db = createDb(platform!.env.DB);
 		const githubToken = platform!.env.GITHUB_TOKEN;
+		const isProduction = platform?.env?.ENVIRONMENT === 'production';
+		log.debug('Environment', { isProduction });
 
 		// Check if user already exists
+		log.time('check-existing-user');
 		const existingUser = await db
 			.select({ id: users.id })
 			.from(users)
 			.where(eq(users.github_username, github_username.toLowerCase()))
 			.limit(1);
+		log.timeEnd('check-existing-user');
 
 		if (existingUser.length > 0) {
+			log.warn('User already exists', { github_username });
 			return fail(409, {
 				error: API_ERROR_CODES.USER_ALREADY_EXISTS,
 				message: `User '${github_username}' is already registered`,
@@ -107,10 +123,21 @@ export const actions: Actions = {
 
 		// Fetch user data and contributions from GitHub
 		try {
+			log.time('github-api');
+			log.info('Fetching GitHub data', { github_username });
 			const githubData = await fetchContributions(github_username, githubToken);
+			log.timeEnd('github-api');
+			log.info('GitHub data received', {
+				login: githubData.user.login,
+				totalContributions: githubData.contributions.totalContributions,
+				daysWithData: githubData.contributions.days.length
+			});
+
 			const githubId = parseGitHubNodeId(githubData.user.id);
 
 			// Insert new user
+			log.time('insert-user');
+			log.info('Inserting user record');
 			const newUser = await db
 				.insert(users)
 				.values({
@@ -129,8 +156,10 @@ export const actions: Actions = {
 					github_created_at: githubData.user.createdAt
 				})
 				.returning();
+			log.timeEnd('insert-user');
 
 			const insertedUser = newUser[0];
+			log.info('User inserted successfully', { userId: insertedUser.id });
 
 			// Insert contribution data for each day using multi-row inserts
 			// D1/SQLite has a 999 parameter limit per query and per batch
@@ -149,25 +178,67 @@ export const actions: Actions = {
 						total_contributions: day.contributionCount
 					}));
 
+				log.info('Preparing contribution inserts', {
+					totalDays: githubData.contributions.days.length,
+					daysWithContributions: contributionValues.length
+				});
+
 				if (contributionValues.length > 0) {
 					// Production D1 supports up to 999 variables per statement
 					// Local D1 dev (miniflare) has stricter limits (~80 vars max)
 					// With 8 columns per row: production=100 rows (800 vars), dev=10 rows (80 vars)
-					const isProduction = platform?.env?.ENVIRONMENT === 'production';
 					const CHUNK_SIZE = isProduction ? 100 : 10;
+					const totalChunks = Math.ceil(contributionValues.length / CHUNK_SIZE);
 
+					log.info('Starting chunked contribution inserts', {
+						totalRows: contributionValues.length,
+						chunkSize: CHUNK_SIZE,
+						totalChunks,
+						isProduction
+					});
+
+					log.time('insert-contributions-total');
 					for (let i = 0; i < contributionValues.length; i += CHUNK_SIZE) {
+						const chunkIndex = Math.floor(i / CHUNK_SIZE) + 1;
 						const chunk = contributionValues.slice(i, i + CHUNK_SIZE);
-						await db.insert(contributions).values(chunk);
+
+						log.debug(`Inserting chunk ${chunkIndex}/${totalChunks}`, {
+							chunkSize: chunk.length,
+							startIndex: i
+						});
+
+						try {
+							await db.insert(contributions).values(chunk);
+							log.debug(`Chunk ${chunkIndex}/${totalChunks} inserted successfully`);
+						} catch (chunkError) {
+							log.error(`Chunk ${chunkIndex}/${totalChunks} insert failed`, {
+								chunkSize: chunk.length,
+								startIndex: i,
+								error: chunkError instanceof Error ? chunkError.message : String(chunkError)
+							});
+							throw chunkError;
+						}
 					}
+					log.timeEnd('insert-contributions-total');
+					log.info('All contributions inserted successfully', {
+						totalRowsInserted: contributionValues.length
+					});
 				}
+			} else {
+				log.info('No contribution days to insert');
 			}
 
 			// Calculate initial rank
+			log.time('calculate-rank');
 			const rank = await calculateUserRank(db, insertedUser.id);
+			log.timeEnd('calculate-rank');
+			log.info('Rank calculated', { rank });
 
 			// Invalidate cache
+			log.time('invalidate-cache');
 			await Promise.all([invalidateLeaderboardCache(kv), deleteCached(kv, statsKey())]);
+			log.timeEnd('invalidate-cache');
+			log.info('Cache invalidated');
 
 			// Store success info in a cookie for display after redirect
 			cookies.set(
@@ -184,6 +255,12 @@ export const actions: Actions = {
 				}
 			);
 
+			log.info('Registration complete', {
+				username: insertedUser.github_username,
+				rank,
+				totalContributions: githubData.contributions.totalContributions
+			});
+
 			// Redirect to homepage with success
 			redirect(303, '/');
 		} catch (error) {
@@ -193,6 +270,7 @@ export const actions: Actions = {
 			}
 
 			if (error instanceof GitHubApiError) {
+				log.error('GitHub API error', { type: error.type, message: error.message });
 				if (error.type === 'NOT_FOUND') {
 					return fail(404, {
 						error: API_ERROR_CODES.GITHUB_USER_NOT_FOUND,
@@ -219,7 +297,10 @@ export const actions: Actions = {
 				}
 			}
 
-			console.error('User registration error:', error);
+			log.error('Registration failed with unexpected error', {
+				error: error instanceof Error ? error.message : String(error),
+				stack: error instanceof Error ? error.stack : undefined
+			});
 			return fail(500, {
 				error: API_ERROR_CODES.INTERNAL_ERROR,
 				message: 'An internal error occurred. Please try again later.',
