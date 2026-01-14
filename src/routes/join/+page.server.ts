@@ -132,9 +132,10 @@ export const actions: Actions = {
 
 			const insertedUser = newUser[0];
 
-			// Insert contribution data for each day using batched chunked inserts
-			// SQLite has a 999 parameter limit per query, with 7 columns we can safely insert ~100 rows per statement
-			// D1 batch API executes all statements in a single network round trip
+			// Insert contribution data for each day using multi-row inserts
+			// D1/SQLite has a 999 parameter limit per query and per batch
+			// With 7 columns, we can safely insert ~100 rows per statement
+			// Execute each insert separately to avoid batch variable limits
 			if (githubData.contributions.days.length > 0) {
 				const contributionValues = githubData.contributions.days
 					.filter((day) => day.contributionCount > 0)
@@ -149,20 +150,13 @@ export const actions: Actions = {
 					}));
 
 				if (contributionValues.length > 0) {
+					// Use multi-row inserts with 100 rows per query (700 variables, well under 999 limit)
+					// Each insert is a single network call, but inserts 100 rows at once
 					const CHUNK_SIZE = 100;
-					const insertStatements = [];
 
 					for (let i = 0; i < contributionValues.length; i += CHUNK_SIZE) {
 						const chunk = contributionValues.slice(i, i + CHUNK_SIZE);
-						insertStatements.push(db.insert(contributions).values(chunk));
-					}
-
-					// Execute all chunked inserts in a single batch (one network round trip)
-					// Type assertion needed as batch() expects a non-empty tuple
-					if (insertStatements.length > 0) {
-						await db.batch(
-							insertStatements as [(typeof insertStatements)[0], ...typeof insertStatements]
-						);
+						await db.insert(contributions).values(chunk);
 					}
 				}
 			}
