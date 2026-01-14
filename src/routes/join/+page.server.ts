@@ -186,68 +186,46 @@ export const actions: Actions = {
 				if (contributionValues.length > 0) {
 					// D1 limit: Maximum 100 bound parameters per query
 					// Each row has 8 parameters, so max 12 rows per query (12 × 8 = 96 params)
+					// Using D1 batch to execute all inserts in a single network request
 					const CHUNK_SIZE = 12;
-					const MAX_RETRIES = 3;
 					const totalChunks = Math.ceil(contributionValues.length / CHUNK_SIZE);
 
-					log.info('Starting chunked contribution inserts', {
+					log.info('Preparing batched contribution inserts', {
 						totalRows: contributionValues.length,
 						chunkSize: CHUNK_SIZE,
-						totalChunks,
-						isProduction
+						totalChunks
 					});
 
-					log.time('insert-contributions-total');
+					// Build array of insert statements for batch execution
+					const insertStatements = [];
 					for (let i = 0; i < contributionValues.length; i += CHUNK_SIZE) {
-						const chunkIndex = Math.floor(i / CHUNK_SIZE) + 1;
 						const chunk = contributionValues.slice(i, i + CHUNK_SIZE);
-
-						log.debug(`Inserting chunk ${chunkIndex}/${totalChunks}`, {
-							chunkSize: chunk.length,
-							startIndex: i
-						});
-
-						// Retry logic for transient D1 failures
-						let lastError: unknown;
-						for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-							try {
-								await db.insert(contributions).values(chunk);
-								log.debug(`Chunk ${chunkIndex}/${totalChunks} inserted successfully`);
-								lastError = null;
-								break;
-							} catch (chunkError) {
-								lastError = chunkError;
-								const errorMsg =
-									chunkError instanceof Error ? chunkError.message : String(chunkError);
-
-								if (attempt < MAX_RETRIES) {
-									log.warn(
-										`Chunk ${chunkIndex}/${totalChunks} attempt ${attempt} failed, retrying...`,
-										{ error: errorMsg }
-									);
-									// Exponential backoff: 100ms, 200ms, 400ms
-									await new Promise((r) => setTimeout(r, 100 * Math.pow(2, attempt - 1)));
-								} else {
-									log.error(
-										`Chunk ${chunkIndex}/${totalChunks} failed after ${MAX_RETRIES} attempts`,
-										{
-											chunkSize: chunk.length,
-											startIndex: i,
-											error: errorMsg
-										}
-									);
-								}
-							}
-						}
-
-						if (lastError) {
-							throw lastError;
-						}
+						insertStatements.push(db.insert(contributions).values(chunk));
 					}
-					log.timeEnd('insert-contributions-total');
-					log.info('All contributions inserted successfully', {
-						totalRowsInserted: contributionValues.length
-					});
+
+					// Execute all inserts in a single batch (1 network request instead of N)
+					log.time('insert-contributions-batch');
+					try {
+						// db.batch requires at least one statement - we've already checked contributionValues.length > 0
+						await db.batch(
+							insertStatements as [
+								(typeof insertStatements)[0],
+								...(typeof insertStatements)[number][]
+							]
+						);
+						log.timeEnd('insert-contributions-batch');
+						log.info('All contributions inserted successfully via batch', {
+							totalRowsInserted: contributionValues.length,
+							batchStatements: insertStatements.length
+						});
+					} catch (batchError) {
+						log.timeEnd('insert-contributions-batch');
+						log.error('Batch insert failed', {
+							totalStatements: insertStatements.length,
+							error: batchError instanceof Error ? batchError.message : String(batchError)
+						});
+						throw batchError;
+					}
 				}
 			} else {
 				log.info('No contribution days to insert');
