@@ -21,47 +21,13 @@ function getAllowedOrigins(environment: string): string[] {
 }
 
 /**
- * Build Content Security Policy header
- * Restricts sources for scripts, images, and other resources
- */
-function buildCspHeader(environment: string): string {
-	const directives: string[] = [
-		// Default: only allow same-origin resources
-		"default-src 'self'",
-		// Scripts: self only (SvelteKit compiles all scripts)
-		// unsafe-inline needed for SvelteKit's hydration scripts in dev
-		environment === 'production' ? "script-src 'self'" : "script-src 'self' 'unsafe-inline'",
-		// Styles: self and inline (TailwindCSS and component styles)
-		"style-src 'self' 'unsafe-inline'",
-		// Images: allow self and GitHub avatars
-		"img-src 'self' https://avatars.githubusercontent.com data:",
-		// Fonts: self only
-		"font-src 'self'",
-		// Connections: self and GitHub API (for future client-side calls if needed)
-		"connect-src 'self' https://api.github.com",
-		// Forms: self only
-		"form-action 'self'",
-		// Frame ancestors: none (prevent clickjacking)
-		"frame-ancestors 'none'",
-		// Base URI: self only
-		"base-uri 'self'",
-		// Object/embed: none
-		"object-src 'none'"
-	];
-
-	return directives.join('; ');
-}
-
-/**
  * Add security headers to response
+ * Note: CSP is handled by SvelteKit in svelte.config.js with proper script hashing
  */
-function addSecurityHeaders(response: Response, environment: string): Response {
+function addSecurityHeaders(response: Response): Response {
 	const headers = new Headers(response.headers);
 
-	// Content Security Policy
-	headers.set('Content-Security-Policy', buildCspHeader(environment));
-
-	// Additional security headers
+	// Additional security headers (CSP is set by SvelteKit)
 	headers.set('X-Content-Type-Options', 'nosniff');
 	headers.set('X-Frame-Options', 'DENY');
 	headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
@@ -143,7 +109,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		return response;
 	}
 
-	// Handle non-API routes: add security headers (including CSP)
+	// Handle non-API routes: add security headers
 	const response = await resolve(event);
-	return addSecurityHeaders(response, environment);
+	return addSecurityHeaders(response);
 };

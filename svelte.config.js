@@ -7,7 +7,24 @@ const config = {
 	// for more information about preprocessors
 	preprocess: vitePreprocess(),
 
-	kit: { adapter: adapter() }
+	kit: {
+		adapter: adapter(),
+		csp: {
+			mode: 'hash',
+			directives: {
+				'default-src': ['self'],
+				'script-src': ['self'],
+				'style-src': ['self', 'unsafe-inline'],
+				'img-src': ['self', 'https://avatars.githubusercontent.com', 'data:'],
+				'font-src': ['self'],
+				'connect-src': ['self', 'https://api.github.com'],
+				'form-action': ['self'],
+				'frame-ancestors': ['none'],
+				'base-uri': ['self'],
+				'object-src': ['none']
+			}
+		}
+	}
 };
 
 export default config;

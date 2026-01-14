@@ -3,7 +3,7 @@
 	import { navigating, page } from '$app/stores';
 	import { resolve } from '$app/paths';
 	import { onMount } from 'svelte';
-	import { Trophy, Github, Twitter, Users, Activity, CheckCircle, Clock } from '@lucide/svelte';
+	import { Github, Twitter, Users, Activity, CheckCircle, Clock } from '@lucide/svelte';
 	import * as Tabs from '$lib/components/ui/tabs';
 	import * as Table from '$lib/components/ui/table';
 	import * as Avatar from '$lib/components/ui/avatar';
