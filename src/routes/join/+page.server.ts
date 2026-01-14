@@ -132,9 +132,9 @@ export const actions: Actions = {
 
 			const insertedUser = newUser[0];
 
-			// Insert contribution data for each day
-			// Cloudflare D1 local dev has very strict SQL variable limits
-			// Insert rows one at a time to avoid any variable limit issues
+			// Insert contribution data for each day using batched chunked inserts
+			// SQLite has a 999 parameter limit per query, with 7 columns we can safely insert ~100 rows per statement
+			// D1 batch API executes all statements in a single network round trip
 			if (githubData.contributions.days.length > 0) {
 				const contributionValues = githubData.contributions.days
 					.filter((day) => day.contributionCount > 0)
@@ -148,9 +148,22 @@ export const actions: Actions = {
 						total_contributions: day.contributionCount
 					}));
 
-				// Insert one at a time to avoid D1 variable limits
-				for (const contrib of contributionValues) {
-					await db.insert(contributions).values(contrib);
+				if (contributionValues.length > 0) {
+					const CHUNK_SIZE = 100;
+					const insertStatements = [];
+
+					for (let i = 0; i < contributionValues.length; i += CHUNK_SIZE) {
+						const chunk = contributionValues.slice(i, i + CHUNK_SIZE);
+						insertStatements.push(db.insert(contributions).values(chunk));
+					}
+
+					// Execute all chunked inserts in a single batch (one network round trip)
+					// Type assertion needed as batch() expects a non-empty tuple
+					if (insertStatements.length > 0) {
+						await db.batch(
+							insertStatements as [(typeof insertStatements)[0], ...typeof insertStatements]
+						);
+					}
 				}
 			}
 
