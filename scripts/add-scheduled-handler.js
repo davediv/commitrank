@@ -37,6 +37,7 @@ import { asc, eq } from "drizzle-orm";
 import { f as fetchContributions, G as GitHubApiError } from "../output/server/chunks/client.js";
 
 const SYNC_REQUEST_DELAY_MS = 100;
+const SYNC_BATCH_SIZE = 250;
 
 async function syncUserContributions(db, userId, username, token) {
   try {
@@ -96,18 +97,24 @@ async function runScheduledSync(dbBinding, kv, token) {
   const startTime = Date.now();
   const db = createDb(dbBinding);
 
-  const allUsers = await db.select({
+  // Count total users
+  const countResult = await db.select({ count: users.id }).from(users);
+  const totalUsersInDb = countResult.length;
+
+  // Fetch batch of users ordered by least recently updated
+  const usersToSync = await db.select({
     id: users.id,
     github_username: users.github_username
-  }).from(users).orderBy(asc(users.updated_at));
+  }).from(users).orderBy(asc(users.updated_at)).limit(SYNC_BATCH_SIZE);
 
   const results = [];
   let successCount = 0;
   let failureCount = 0;
 
-  console.log(\`[Sync] Starting sync for \${allUsers.length} users\`);
+  console.log(\`[Sync] Starting batched sync: \${usersToSync.length}/\${totalUsersInDb} users (batch size: \${SYNC_BATCH_SIZE})\`);
 
-  for (const user of allUsers) {
+  for (let i = 0; i < usersToSync.length; i++) {
+    const user = usersToSync[i];
     const result = await syncUserContributions(db, user.id, user.github_username, token);
     if (result.success) {
       successCount++;
@@ -117,7 +124,7 @@ async function runScheduledSync(dbBinding, kv, token) {
       console.log(\`[Sync] ✗ \${user.github_username}: \${result.error}\`);
     }
     results.push(result);
-    if (allUsers.indexOf(user) < allUsers.length - 1) {
+    if (i < usersToSync.length - 1) {
       await syncSleep(SYNC_REQUEST_DELAY_MS);
     }
   }
@@ -130,9 +137,9 @@ async function runScheduledSync(dbBinding, kv, token) {
   ]);
 
   const durationMs = Date.now() - startTime;
-  console.log(\`[Sync] Completed in \${Math.round(durationMs / 1000)}s: \${successCount} success, \${failureCount} failed\`);
+  console.log(\`[Sync] Completed in \${Math.round(durationMs / 1000)}s: \${successCount}/\${usersToSync.length} success, \${failureCount} failed (\${totalUsersInDb} total users)\`);
 
-  return { totalUsers: allUsers.length, successCount, failureCount, results, durationMs };
+  return { totalUsersInDb, batchSize: SYNC_BATCH_SIZE, syncedCount: usersToSync.length, successCount, failureCount, results, durationMs };
 }
 
 /**
@@ -152,7 +159,7 @@ export async function scheduled(event, env, ctx) {
   try {
     ctx.waitUntil((async () => {
       const summary = await runScheduledSync(env.DB, env.KV, githubToken);
-      console.log(\`[Cron] Sync completed: \${summary.successCount}/\${summary.totalUsers} succeeded in \${Math.round(summary.durationMs / 1000)}s\`);
+      console.log(\`[Cron] Sync completed: \${summary.successCount}/\${summary.syncedCount} succeeded in \${Math.round(summary.durationMs / 1000)}s (\${summary.totalUsersInDb} total users)\`);
     })());
   } catch (error) {
     console.error("[Cron] Sync failed:", error instanceof Error ? error.message : error);
@@ -169,7 +176,11 @@ if (!exportMatch) {
 
 // Insert the scheduled handler code before the final export
 const insertPosition = exportMatch.index;
-workerCode = workerCode.slice(0, insertPosition) + scheduledHandlerCode + '\n' + workerCode.slice(insertPosition);
+workerCode =
+	workerCode.slice(0, insertPosition) +
+	scheduledHandlerCode +
+	'\n' +
+	workerCode.slice(insertPosition);
 
 // No need to modify export - the function is already exported via `export async function scheduled`
 
