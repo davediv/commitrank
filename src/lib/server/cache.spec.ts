@@ -43,7 +43,7 @@ function createMockKV() {
 describe('Cache Utilities', () => {
 	describe('CACHE_TTL constants', () => {
 		it('should have correct LEADERBOARD TTL', () => {
-			expect(CACHE_TTL.LEADERBOARD).toBe(300);
+			expect(CACHE_TTL.LEADERBOARD).toBe(21600);
 		});
 
 		it('should have correct USER TTL', () => {
@@ -55,7 +55,7 @@ describe('Cache Utilities', () => {
 		});
 
 		it('should have correct STATS TTL', () => {
-			expect(CACHE_TTL.STATS).toBe(300);
+			expect(CACHE_TTL.STATS).toBe(21600);
 		});
 	});
 
