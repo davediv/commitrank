@@ -8,14 +8,14 @@
  * Cache TTL constants (in seconds)
  */
 export const CACHE_TTL = {
-	/** Leaderboard cache - 5 minutes */
-	LEADERBOARD: 300,
+	/** Leaderboard cache - 6 hours (invalidated on sync/join) */
+	LEADERBOARD: 21600,
 	/** Individual user cache - 10 minutes */
 	USER: 600,
 	/** GitHub API response cache - 1 hour */
 	GITHUB: 3600,
-	/** Stats cache - 5 minutes */
-	STATS: 300
+	/** Stats cache - 6 hours (invalidated on sync/join) */
+	STATS: 21600
 } as const;
 
 /**
