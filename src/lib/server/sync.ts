@@ -7,7 +7,7 @@
 
 import { createDb } from './db';
 import { users, contributions } from './db/schema';
-import { eq, asc } from 'drizzle-orm';
+import { eq, asc, and } from 'drizzle-orm';
 import { fetchContributions, GitHubApiError } from './github';
 import {
 	invalidateLeaderboardCache,
@@ -100,7 +100,7 @@ async function syncUserContributions(
 			for (const contrib of recentContributions) {
 				await db
 					.delete(contributions)
-					.where(eq(contributions.user_id, userId) && eq(contributions.date, contrib.date));
+					.where(and(eq(contributions.user_id, userId), eq(contributions.date, contrib.date)));
 			}
 
 			// Insert new records
