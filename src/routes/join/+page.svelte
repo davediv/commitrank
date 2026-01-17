@@ -1,9 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
-	import { Github, Twitter, Loader2 } from '@lucide/svelte';
-	import * as Card from '$lib/components/ui/card';
-	import * as Alert from '$lib/components/ui/alert';
+	import { Github, AtSign, Loader2, ArrowLeft } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import type { ActionData } from './$types';
@@ -14,12 +12,12 @@
 
 	let { form }: Props = $props();
 
-	// Form state - use $derived for initial values from form props to be reactive
+	// Form state
 	let isSubmitting = $state(false);
 	let github_username = $state('');
 	let twitter_handle = $state('');
 
-	// Sync form values when form prop changes (e.g., after server validation error)
+	// Sync form values when form prop changes
 	$effect(() => {
 		if (form?.github_username !== undefined) {
 			github_username = form.github_username ?? '';
@@ -39,11 +37,11 @@
 
 	function validateGitHub(value: string): boolean {
 		if (!value) {
-			githubError = 'GitHub username is required';
+			githubError = 'Required';
 			return false;
 		}
 		if (!GITHUB_USERNAME_REGEX.test(value)) {
-			githubError = 'Invalid format. 1-39 chars, alphanumeric or hyphen';
+			githubError = 'Invalid username format';
 			return false;
 		}
 		githubError = '';
@@ -52,7 +50,7 @@
 
 	function validateTwitter(value: string): boolean {
 		if (value && !TWITTER_HANDLE_REGEX.test(value)) {
-			twitterError = 'Invalid format. 1-15 chars, alphanumeric or underscore';
+			twitterError = 'Invalid handle format';
 			return false;
 		}
 		twitterError = '';
@@ -74,119 +72,115 @@
 	}
 </script>
 
-<div class="container mx-auto px-4 py-8">
-	<Card.Root class="mx-auto max-w-md">
-		<Card.Header class="text-center">
-			<Card.Title class="text-2xl">Join the CommitRank Leaderboard</Card.Title>
-			<Card.Description>
-				Enter your GitHub username to see where you rank among developers.
-			</Card.Description>
-		</Card.Header>
-		<Card.Content>
-			<!-- Error Alert -->
-			{#if form?.error}
-				<Alert.Root variant="destructive" class="mb-6">
-					<Alert.Title>Registration Failed</Alert.Title>
-					<Alert.Description>{form.message}</Alert.Description>
-				</Alert.Root>
+<svelte:head>
+	<title>Join - CommitRank</title>
+	<meta name="description" content="Join the CommitRank leaderboard and see where you rank." />
+</svelte:head>
+
+<div class="mx-auto max-w-sm px-4 py-12">
+	<!-- Back link -->
+	<a
+		href={resolve('/')}
+		class="mb-8 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+	>
+		<ArrowLeft class="h-3 w-3" />
+		Back to leaderboard
+	</a>
+
+	<!-- Header -->
+	<div class="mb-6">
+		<h1 class="text-lg font-semibold">Join CommitRank</h1>
+		<p class="mt-1 text-sm text-muted-foreground">
+			Enter your GitHub username to see where you rank.
+		</p>
+	</div>
+
+	<!-- Error message -->
+	{#if form?.error}
+		<div
+			class="mb-4 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+		>
+			{form.message}
+		</div>
+	{/if}
+
+	<!-- Form -->
+	<form
+		method="POST"
+		use:enhance={() => {
+			if (!handleSubmit()) {
+				return;
+			}
+			isSubmitting = true;
+			return async ({ update }) => {
+				isSubmitting = false;
+				await update();
+			};
+		}}
+		class="space-y-4"
+	>
+		<!-- GitHub Username -->
+		<div class="space-y-1.5">
+			<label for="github_username" class="flex items-center gap-1.5 text-sm font-medium">
+				<Github class="h-3.5 w-3.5" />
+				GitHub Username
+			</label>
+			<Input
+				type="text"
+				id="github_username"
+				name="github_username"
+				placeholder="octocat"
+				bind:value={github_username}
+				onblur={handleGitHubBlur}
+				aria-invalid={!!githubError || !!form?.error}
+				class="h-9 {githubError || (form?.error && form?.error !== 'INVALID_TWITTER')
+					? 'border-destructive focus-visible:ring-destructive'
+					: ''}"
+				disabled={isSubmitting}
+				required
+			/>
+			{#if githubError}
+				<p class="text-xs text-destructive">{githubError}</p>
 			{/if}
+		</div>
 
-			<form
-				method="POST"
-				use:enhance={() => {
-					if (!handleSubmit()) {
-						return;
-					}
-					isSubmitting = true;
-					return async ({ update }) => {
-						isSubmitting = false;
-						await update();
-					};
-				}}
-			>
-				<div class="space-y-4">
-					<!-- GitHub Username -->
-					<div class="space-y-2">
-						<label for="github_username" class="text-sm leading-none font-medium">
-							<span class="flex items-center gap-2">
-								<Github class="h-4 w-4" />
-								GitHub Username
-								<span class="text-destructive">*</span>
-							</span>
-						</label>
-						<Input
-							type="text"
-							id="github_username"
-							name="github_username"
-							placeholder="octocat"
-							bind:value={github_username}
-							onblur={handleGitHubBlur}
-							aria-invalid={!!githubError || !!form?.error}
-							class={githubError || (form?.error && form?.error !== 'INVALID_TWITTER')
-								? 'border-destructive'
-								: ''}
-							disabled={isSubmitting}
-							required
-						/>
-						{#if githubError}
-							<p class="text-sm text-destructive">{githubError}</p>
-						{/if}
-					</div>
+		<!-- Twitter Handle -->
+		<div class="space-y-1.5">
+			<label for="twitter_handle" class="flex items-center gap-1.5 text-sm font-medium">
+				<AtSign class="h-3.5 w-3.5" />
+				<span>X Handle</span>
+				<span class="font-normal text-muted-foreground">(optional)</span>
+			</label>
+			<Input
+				type="text"
+				id="twitter_handle"
+				name="twitter_handle"
+				placeholder="username"
+				bind:value={twitter_handle}
+				onblur={handleTwitterBlur}
+				class="h-9 {twitterError || form?.error === 'INVALID_TWITTER'
+					? 'border-destructive focus-visible:ring-destructive'
+					: ''}"
+				disabled={isSubmitting}
+			/>
+			{#if twitterError}
+				<p class="text-xs text-destructive">{twitterError}</p>
+			{/if}
+		</div>
 
-					<!-- Twitter Handle -->
-					<div class="space-y-2">
-						<label for="twitter_handle" class="text-sm leading-none font-medium">
-							<span class="flex items-center gap-2">
-								<Twitter class="h-4 w-4" />
-								Twitter/X Handle
-								<span class="text-muted-foreground">(optional)</span>
-							</span>
-						</label>
-						<div class="relative">
-							<span class="absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground">@</span>
-							<Input
-								type="text"
-								id="twitter_handle"
-								name="twitter_handle"
-								placeholder="username"
-								bind:value={twitter_handle}
-								onblur={handleTwitterBlur}
-								class={twitterError || form?.error === 'INVALID_TWITTER'
-									? 'border-destructive pl-7'
-									: 'pl-7'}
-								disabled={isSubmitting}
-							/>
-						</div>
-						{#if twitterError}
-							<p class="text-sm text-destructive">{twitterError}</p>
-						{/if}
-					</div>
+		<!-- Submit Button -->
+		<Button type="submit" class="h-9 w-full" disabled={isSubmitting}>
+			{#if isSubmitting}
+				<Loader2 class="mr-1.5 h-3.5 w-3.5 animate-spin" />
+				Joining...
+			{:else}
+				Join Leaderboard
+			{/if}
+		</Button>
+	</form>
 
-					<!-- Submit Button -->
-					<Button type="submit" class="w-full" disabled={isSubmitting}>
-						{#if isSubmitting}
-							<Loader2 class="mr-2 h-4 w-4 animate-spin" />
-							Joining...
-						{:else}
-							Join Leaderboard
-						{/if}
-					</Button>
-				</div>
-			</form>
-
-			<!-- Privacy Notice -->
-			<p class="mt-6 text-center text-xs text-muted-foreground">
-				By joining, you agree to have your public GitHub contribution data displayed on our
-				leaderboard. We only access publicly available information.
-			</p>
-		</Card.Content>
-		<Card.Footer class="justify-center">
-			<a
-				href={resolve('/')}
-				class="text-sm text-muted-foreground hover:text-primary hover:underline"
-			>
-				← Back to Leaderboard
-			</a>
-		</Card.Footer>
-	</Card.Root>
+	<!-- Privacy Notice -->
+	<p class="mt-6 text-center text-[11px] leading-relaxed text-muted-foreground">
+		By joining, you agree to have your public GitHub contribution data displayed on the leaderboard.
+	</p>
 </div>
