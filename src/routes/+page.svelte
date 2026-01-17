@@ -150,10 +150,11 @@
 {/if}
 
 <!-- Hero Section -->
-<div class="border-b border-border/50 py-10">
-	<div class="mx-auto max-w-3xl px-4 text-center">
-		<h1 class="text-2xl font-bold tracking-tight sm:text-3xl">CommitRank</h1>
-		<p class="mt-2 text-muted-foreground">GitHub Commit Leaderboard</p>
+<div class="hero-gradient relative overflow-hidden border-b border-border/50 py-16">
+	<div class="hero-glow"></div>
+	<div class="relative z-10 mx-auto max-w-3xl px-4 text-center">
+		<h1 class="hero-title text-3xl font-bold tracking-tight sm:text-4xl">CommitRank</h1>
+		<p class="mt-3 text-muted-foreground">GitHub Commit Leaderboard</p>
 	</div>
 </div>
 
