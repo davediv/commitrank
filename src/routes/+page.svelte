@@ -150,7 +150,7 @@
 {/if}
 
 <!-- Hero Section -->
-<div class="hero-gradient relative overflow-hidden border-b border-border/50 py-16">
+<div class="hero-gradient relative overflow-hidden py-16">
 	<div class="hero-glow"></div>
 	<div class="relative z-10 mx-auto max-w-3xl px-4 text-center">
 		<h1 class="hero-title text-3xl font-bold tracking-tight sm:text-4xl">CommitRank</h1>
@@ -218,7 +218,7 @@
 							</td>
 							<td class="py-3 pl-2">
 								<div class="flex items-center gap-2.5">
-									<Skeleton class="h-7 w-7 rounded-full" />
+									<Skeleton class="h-8 w-8 rounded-full" />
 									<div class="flex flex-col gap-1">
 										<Skeleton class="h-3.5 w-20" />
 										<Skeleton class="h-2.5 w-14" />
@@ -256,14 +256,14 @@
 							</td>
 							<td class="py-2.5 pl-2">
 								<div class="flex items-center gap-2.5">
-									<Avatar.Root class="h-7 w-7">
+									<Avatar.Root class="h-8 w-8">
 										<Avatar.Image
 											src={getAvatarUrl(entry.avatar_url)}
 											alt={entry.github_username}
 											loading="lazy"
 											decoding="async"
-											width={28}
-											height={28}
+											width={32}
+											height={32}
 										/>
 										<Avatar.Fallback class="text-[10px]">
 											{entry.github_username.slice(0, 2).toUpperCase()}
