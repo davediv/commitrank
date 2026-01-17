@@ -2,7 +2,10 @@
  * Post-build script to add scheduled handler to the Cloudflare Worker
  *
  * This script patches the SvelteKit-generated _worker.js to add support
- * for Cloudflare Cron Triggers by adding a `scheduled` export.
+ * for Cloudflare Cron Triggers by adding a `scheduled` method to the default export.
+ *
+ * IMPORTANT: Cloudflare Workers require the scheduled handler to be a METHOD
+ * on the default export object, NOT a standalone exported function.
  *
  * Run after `npm run build` with: node scripts/add-scheduled-handler.js
  */
@@ -17,18 +20,16 @@ const workerPath = join(__dirname, '../.svelte-kit/cloudflare/_worker.js');
 // Read the generated worker
 let workerCode = readFileSync(workerPath, 'utf-8');
 
-// Check if already patched
-if (workerCode.includes('export async function scheduled')) {
+// Check if already patched (look for the scheduled method inside worker_default)
+if (workerCode.includes('async scheduled(event, env, ctx)')) {
 	console.log('Worker already patched with scheduled handler');
 	process.exit(0);
 }
 
-// The scheduled handler code to add
-// This imports from the built chunks and calls runScheduledSync
-const scheduledHandlerCode = `
-
+// Helper functions to add before worker_default
+const helperFunctionsCode = `
 // ============================================
-// SCHEDULED HANDLER (added by post-build script)
+// SCHEDULED HANDLER HELPERS (added by post-build script)
 // ============================================
 
 // Import sync dependencies from built chunks
@@ -142,48 +143,70 @@ async function runScheduledSync(dbBinding, kv, token) {
   return { totalUsersInDb, batchSize: SYNC_BATCH_SIZE, syncedCount: usersToSync.length, successCount, failureCount, results, durationMs };
 }
 
-/**
- * Scheduled event handler for Cloudflare Cron Triggers
- * Runs at: 0 0,6,12,18 * * * (00:00, 06:00, 12:00, 18:00 UTC)
- */
-export async function scheduled(event, env, ctx) {
-  console.log(\`[Cron] Scheduled sync triggered at \${new Date(event.scheduledTime).toISOString()}\`);
-  console.log(\`[Cron] Cron pattern: \${event.cron}\`);
-
-  const githubToken = env.GITHUB_TOKEN;
-  if (!githubToken) {
-    console.error("[Cron] GITHUB_TOKEN not configured");
-    return;
-  }
-
-  try {
-    ctx.waitUntil((async () => {
-      const summary = await runScheduledSync(env.DB, env.KV, githubToken);
-      console.log(\`[Cron] Sync completed: \${summary.successCount}/\${summary.syncedCount} succeeded in \${Math.round(summary.durationMs / 1000)}s (\${summary.totalUsersInDb} total users)\`);
-    })());
-  } catch (error) {
-    console.error("[Cron] Sync failed:", error instanceof Error ? error.message : error);
-  }
-}
 `;
 
-// Find the export statement and add the scheduled handler before it
-const exportMatch = workerCode.match(/export\s*\{[\s\S]*?\};?\s*$/);
-if (!exportMatch) {
-	console.error('Could not find export statement in worker');
+// The scheduled method to add inside worker_default object (after fetch method)
+const scheduledMethodCode = `,
+  /**
+   * Scheduled event handler for Cloudflare Cron Triggers
+   * Runs at: 0 0,6,12,18 * * * (00:00, 06:00, 12:00, 18:00 UTC)
+   */
+  async scheduled(event, env, ctx) {
+    console.log(\`[Cron] Scheduled sync triggered at \${new Date(event.scheduledTime).toISOString()}\`);
+    console.log(\`[Cron] Cron pattern: \${event.cron}\`);
+
+    const githubToken = env.GITHUB_TOKEN;
+    if (!githubToken) {
+      console.error("[Cron] GITHUB_TOKEN not configured");
+      return;
+    }
+
+    try {
+      ctx.waitUntil((async () => {
+        const summary = await runScheduledSync(env.DB, env.KV, githubToken);
+        console.log(\`[Cron] Sync completed: \${summary.successCount}/\${summary.syncedCount} succeeded in \${Math.round(summary.durationMs / 1000)}s (\${summary.totalUsersInDb} total users)\`);
+      })());
+    } catch (error) {
+      console.error("[Cron] Sync failed:", error instanceof Error ? error.message : error);
+    }
+  }`;
+
+// Step 1: Find var worker_default and insert helper functions before it
+const workerDefaultMatch = workerCode.match(/var\s+worker_default\s*=\s*\{/);
+if (!workerDefaultMatch) {
+	console.error('Could not find worker_default declaration in worker');
 	process.exit(1);
 }
 
-// Insert the scheduled handler code before the final export
-const insertPosition = exportMatch.index;
+// Insert helper functions before worker_default
 workerCode =
-	workerCode.slice(0, insertPosition) +
-	scheduledHandlerCode +
-	'\n' +
-	workerCode.slice(insertPosition);
+	workerCode.slice(0, workerDefaultMatch.index) +
+	helperFunctionsCode +
+	workerCode.slice(workerDefaultMatch.index);
 
-// No need to modify export - the function is already exported via `export async function scheduled`
+// Step 2: Find the closing brace of the fetch method and add scheduled method after it
+// The fetch method ends with "return pragma && res.status < 400 ? c(req, res, ctx) : res;\n  }\n};"
+// We need to insert before the final "};" of worker_default
+
+// Find the pattern: end of fetch method followed by closing of worker_default object
+// Looking for the pattern "  }\n};" which closes fetch and then worker_default
+const fetchEndPattern =
+	/return pragma && res\.status < 400 \? c\(req, res, ctx\) : res;\s*\}\s*\};/;
+const fetchEndMatch = workerCode.match(fetchEndPattern);
+
+if (!fetchEndMatch) {
+	console.error('Could not find fetch method end pattern in worker');
+	process.exit(1);
+}
+
+// Replace the closing to inject our scheduled method
+workerCode = workerCode.replace(
+	fetchEndPattern,
+	`return pragma && res.status < 400 ? c(req, res, ctx) : res;
+  }${scheduledMethodCode}
+};`
+);
 
 // Write the patched worker
 writeFileSync(workerPath, workerCode);
-console.log('Successfully added scheduled handler to worker');
+console.log('Successfully added scheduled handler to worker (as method on default export)');
