@@ -3,9 +3,7 @@
 	import { navigating, page } from '$app/stores';
 	import { resolve } from '$app/paths';
 	import { onMount } from 'svelte';
-	import { Github, Twitter, Users, Activity, CheckCircle, Clock } from '@lucide/svelte';
-	import * as Tabs from '$lib/components/ui/tabs';
-	import * as Table from '$lib/components/ui/table';
+	import { ExternalLink, Users, GitCommitHorizontal, Clock, CheckCircle } from '@lucide/svelte';
 	import * as Avatar from '$lib/components/ui/avatar';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Button } from '$lib/components/ui/button';
@@ -78,19 +76,11 @@
 		return new Intl.NumberFormat().format(num);
 	}
 
-	/**
-	 * Get optimized GitHub avatar URL with proper sizing
-	 * Uses 2x size for retina displays when avatar is displayed at 32px (h-8 w-8)
-	 */
 	function getAvatarUrl(url: string | null, size: number = 64): string {
 		if (!url) return '';
-		// GitHub avatar URL with size parameter (2x for retina: 64px for 32px display)
 		return url.includes('?') ? `${url}&s=${size}` : `${url}?s=${size}`;
 	}
 
-	/**
-	 * Format an ISO date string to relative time (e.g., "2 hours ago")
-	 */
 	function formatRelativeTime(isoString: string | null): string {
 		if (!isoString) return 'Never';
 
@@ -102,10 +92,18 @@
 		const diffDays = Math.floor(diffHours / 24);
 
 		if (diffMins < 1) return 'Just now';
-		if (diffMins < 60) return `${diffMins} min${diffMins === 1 ? '' : 's'} ago`;
-		if (diffHours < 24) return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
-		return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
+		if (diffMins < 60) return `${diffMins}m ago`;
+		if (diffHours < 24) return `${diffHours}h ago`;
+		return `${diffDays}d ago`;
 	}
+
+	// Period tabs configuration
+	const periods = [
+		{ value: 'today', label: 'Today' },
+		{ value: '7days', label: '7d' },
+		{ value: '30days', label: '30d' },
+		{ value: 'year', label: 'Year' }
+	];
 </script>
 
 <!-- SEO Meta Tags -->
@@ -129,205 +127,187 @@
 	/>
 </svelte:head>
 
-<!-- Noscript fallback message -->
-<noscript>
-	<div
-		class="border-b border-yellow-200 bg-yellow-50 px-4 py-2 text-center text-sm text-yellow-800"
-	>
-		JavaScript is disabled. Tab switching and pagination require JavaScript, but the leaderboard
-		content is fully visible.
-	</div>
-</noscript>
-
 <!-- Success Modal -->
 {#if successMessage}
 	<Dialog.Root bind:open={showSuccessModal} onOpenChange={dismissSuccess}>
-		<Dialog.Content class="sm:max-w-md">
+		<Dialog.Content class="sm:max-w-sm">
 			<Dialog.Header>
-				<Dialog.Title class="flex items-center gap-2">
-					<CheckCircle class="h-5 w-5 text-green-500" />
-					Welcome to CommitRank!
+				<Dialog.Title class="flex items-center gap-2 text-base">
+					<CheckCircle class="h-4 w-4 text-primary" />
+					Welcome to CommitRank
 				</Dialog.Title>
-				<Dialog.Description>
-					<strong>@{successMessage.username}</strong> has joined the leaderboard at rank
-					<strong>#{successMessage.rank}</strong>
-					with <strong>{formatNumber(successMessage.contributions)}</strong> contributions this year.
+				<Dialog.Description class="text-sm">
+					<strong class="text-foreground">@{successMessage.username}</strong> joined at rank
+					<strong class="text-foreground">#{successMessage.rank}</strong>
+					with <strong class="text-primary">{formatNumber(successMessage.contributions)}</strong> contributions.
 				</Dialog.Description>
 			</Dialog.Header>
 			<Dialog.Footer>
-				<Button onclick={dismissSuccess}>View Leaderboard</Button>
+				<Button onclick={dismissSuccess} size="sm">View Leaderboard</Button>
 			</Dialog.Footer>
 		</Dialog.Content>
 	</Dialog.Root>
 {/if}
 
-<div class="mx-auto max-w-2xl px-4 py-8">
-	<!-- Header Section -->
-	<div class="mb-8 text-center">
-		<div class="mb-4 flex items-center justify-center gap-3">
-			<h1 class="text-3xl font-bold tracking-tight sm:text-4xl">Commit Rank</h1>
+<div class="mx-auto max-w-3xl px-4 py-6">
+	<!-- Header with stats -->
+	<div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+		<div>
+			<h1 class="text-lg font-semibold">Leaderboard</h1>
+			{#if data.stats}
+				<div class="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+					<span class="flex items-center gap-1">
+						<Users class="h-3 w-3" />
+						{formatNumber(data.stats.total_users)}
+					</span>
+					<span class="flex items-center gap-1">
+						<GitCommitHorizontal class="h-3 w-3" />
+						{formatNumber(data.stats.total_contributions_today)} today
+					</span>
+					<span class="flex items-center gap-1" title={data.stats.last_sync || 'Never'}>
+						<Clock class="h-3 w-3" />
+						{formatRelativeTime(data.stats.last_sync)}
+					</span>
+				</div>
+			{/if}
 		</div>
-		<p class="text-muted-foreground">GitHub Commit Leaderboard</p>
-	</div>
 
-	<!-- Stats Summary -->
-	{#if data.stats}
-		<div
-			class="mb-8 flex flex-wrap items-center justify-center gap-6 text-sm text-muted-foreground"
-		>
-			<div class="flex items-center gap-2">
-				<Users class="h-4 w-4" />
-				<span>{formatNumber(data.stats.total_users)} developers</span>
-			</div>
-			<div class="flex items-center gap-2">
-				<Activity class="h-4 w-4" />
-				<span>{formatNumber(data.stats.total_contributions_today)} contributions today</span>
-			</div>
-			<div class="flex items-center gap-2" title={data.stats.last_sync || 'Never synced'}>
-				<Clock class="h-4 w-4" />
-				<span>Updated {formatRelativeTime(data.stats.last_sync)}</span>
-			</div>
+		<!-- Period Tabs -->
+		<div class="flex rounded-md border border-border bg-muted/30 p-0.5">
+			{#each periods as period (period.value)}
+				<button
+					onclick={() => handlePeriodChange(period.value)}
+					class="rounded px-3 py-1 text-xs font-medium transition-colors {data.period ===
+					period.value
+						? 'bg-card text-foreground shadow-sm'
+						: 'text-muted-foreground hover:text-foreground'}"
+				>
+					{period.label}
+				</button>
+			{/each}
 		</div>
-	{/if}
-
-	<!-- Time Period Tabs -->
-	<div class="mb-6">
-		<Tabs.Root value={data.period} onValueChange={handlePeriodChange} class="w-full">
-			<Tabs.List class="grid w-full grid-cols-4">
-				<Tabs.Trigger value="today">Today</Tabs.Trigger>
-				<Tabs.Trigger value="7days">7 Days</Tabs.Trigger>
-				<Tabs.Trigger value="30days">30 Days</Tabs.Trigger>
-				<Tabs.Trigger value="year">Year</Tabs.Trigger>
-			</Tabs.List>
-		</Tabs.Root>
 	</div>
 
 	<!-- Leaderboard Table -->
-	<div class="rounded-md border">
-		<Table.Root>
-			<Table.Header>
-				<Table.Row>
-					<Table.Head class="w-16 text-center">Rank</Table.Head>
-					<Table.Head>Developer</Table.Head>
-					<Table.Head class="w-32 text-right">Contributions</Table.Head>
-					<Table.Head class="hidden w-32 text-right sm:table-cell">Twitter</Table.Head>
-				</Table.Row>
-			</Table.Header>
-			<Table.Body>
+	<div class="overflow-hidden rounded-md border border-border">
+		<table class="w-full">
+			<thead>
+				<tr class="border-b border-border bg-muted/30 text-xs text-muted-foreground">
+					<th class="w-12 py-2 text-center font-medium">#</th>
+					<th class="py-2 pl-2 text-left font-medium">Developer</th>
+					<th class="w-24 py-2 pr-4 text-right font-medium">Commits</th>
+				</tr>
+			</thead>
+			<tbody class="divide-y divide-border">
 				{#if isLoading}
 					<!-- Loading skeleton -->
 					{#each Array.from({ length: SKELETON_ROWS }, (_, i) => i) as i (i)}
-						<Table.Row>
-							<Table.Cell class="text-center">
-								<Skeleton class="mx-auto h-5 w-5" />
-							</Table.Cell>
-							<Table.Cell>
-								<div class="flex items-center gap-3">
-									<Skeleton class="h-8 w-8 rounded-full" />
+						<tr>
+							<td class="py-3 text-center">
+								<Skeleton class="mx-auto h-4 w-4" />
+							</td>
+							<td class="py-3 pl-2">
+								<div class="flex items-center gap-2.5">
+									<Skeleton class="h-7 w-7 rounded-full" />
 									<div class="flex flex-col gap-1">
-										<Skeleton class="h-4 w-24" />
-										<Skeleton class="h-3 w-16" />
+										<Skeleton class="h-3.5 w-20" />
+										<Skeleton class="h-2.5 w-14" />
 									</div>
 								</div>
-							</Table.Cell>
-							<Table.Cell class="text-right">
-								<Skeleton class="ml-auto h-4 w-12" />
-							</Table.Cell>
-							<Table.Cell class="hidden text-right sm:table-cell">
-								<Skeleton class="ml-auto h-4 w-20" />
-							</Table.Cell>
-						</Table.Row>
+							</td>
+							<td class="py-3 pr-4 text-right">
+								<Skeleton class="ml-auto h-4 w-10" />
+							</td>
+						</tr>
 					{/each}
 				{:else if data.leaderboard.leaderboard.length === 0}
-					<Table.Row>
-						<Table.Cell colspan={4} class="py-12 text-center text-muted-foreground">
-							No developers on the leaderboard yet. Be the first to
-							<a href={resolve('/join')} class="text-primary underline">join</a>!
-						</Table.Cell>
-					</Table.Row>
+					<tr>
+						<td colspan={3} class="py-12 text-center text-sm text-muted-foreground">
+							No developers yet.
+							<a href={resolve('/join')} class="text-primary hover:underline">Be the first</a>
+						</td>
+					</tr>
 				{:else}
 					{#each data.leaderboard.leaderboard as entry (entry.github_username)}
-						<Table.Row>
-							<Table.Cell class="text-center font-medium">
-								{entry.rank}
-							</Table.Cell>
-							<Table.Cell>
-								<div class="flex items-center gap-3">
-									<Avatar.Root class="h-8 w-8">
+						<tr class="table-row-hover">
+							<td class="py-2.5 text-center">
+								{#if entry.rank === 1}
+									<span class="rank-badge rank-badge-gold">1</span>
+								{:else if entry.rank === 2}
+									<span class="rank-badge rank-badge-silver">2</span>
+								{:else if entry.rank === 3}
+									<span class="rank-badge rank-badge-bronze">3</span>
+								{:else}
+									<span class="text-xs text-muted-foreground">{entry.rank}</span>
+								{/if}
+							</td>
+							<td class="py-2.5 pl-2">
+								<div class="flex items-center gap-2.5">
+									<Avatar.Root class="h-7 w-7">
 										<Avatar.Image
 											src={getAvatarUrl(entry.avatar_url)}
 											alt={entry.github_username}
 											loading="lazy"
 											decoding="async"
-											width={32}
-											height={32}
+											width={28}
+											height={28}
 										/>
-										<Avatar.Fallback>
+										<Avatar.Fallback class="text-[10px]">
 											{entry.github_username.slice(0, 2).toUpperCase()}
 										</Avatar.Fallback>
 									</Avatar.Root>
-									<div class="flex flex-col">
+									<div class="min-w-0 flex-1">
 										<a
 											href="https://github.com/{entry.github_username}"
 											target="_blank"
 											rel="noopener noreferrer"
-											class="flex items-center gap-1 font-medium hover:text-primary hover:underline"
+											class="group flex items-center gap-1 text-sm font-medium text-foreground hover:text-primary"
 										>
-											<Github class="h-3 w-3" />
 											{entry.github_username}
+											<ExternalLink
+												class="h-3 w-3 opacity-0 transition-opacity group-hover:opacity-50"
+											/>
 										</a>
 										{#if entry.display_name}
-											<span class="text-xs text-muted-foreground">{entry.display_name}</span>
+											<p class="truncate text-xs text-muted-foreground">
+												{entry.display_name}
+											</p>
 										{/if}
 									</div>
 								</div>
-							</Table.Cell>
-							<Table.Cell class="text-right font-mono font-semibold">
-								{formatNumber(entry.contributions)}
-							</Table.Cell>
-							<Table.Cell class="hidden text-right sm:table-cell">
-								{#if entry.twitter_handle}
-									<a
-										href="https://twitter.com/{entry.twitter_handle}"
-										target="_blank"
-										rel="noopener noreferrer"
-										class="flex items-center justify-end gap-1 text-muted-foreground hover:text-primary"
-									>
-										<Twitter class="h-3 w-3" />
-										@{entry.twitter_handle}
-									</a>
-								{:else}
-									<span class="text-muted-foreground">-</span>
-								{/if}
-							</Table.Cell>
-						</Table.Row>
+							</td>
+							<td class="py-2.5 pr-4 text-right">
+								<span class="contrib-count text-sm font-medium">
+									{formatNumber(entry.contributions)}
+								</span>
+							</td>
+						</tr>
 					{/each}
 				{/if}
-			</Table.Body>
-		</Table.Root>
+			</tbody>
+		</table>
 	</div>
 
 	<!-- Pagination -->
 	{#if data.leaderboard.pagination.totalPages > 1}
-		<div class="mt-6 flex items-center justify-between">
-			<p class="text-sm text-muted-foreground">
+		<div class="mt-4 flex items-center justify-between text-xs">
+			<span class="text-muted-foreground">
 				Page {data.leaderboard.pagination.page} of {data.leaderboard.pagination.totalPages}
-				<span class="hidden sm:inline">
-					({formatNumber(data.leaderboard.pagination.total)} developers)
-				</span>
-			</p>
-			<div class="flex gap-2">
+			</span>
+			<div class="flex gap-1">
 				<Button
-					variant="outline"
+					variant="ghost"
 					size="sm"
+					class="h-7 px-2 text-xs"
 					disabled={data.leaderboard.pagination.page <= 1}
 					onclick={() => handlePageChange(data.leaderboard.pagination.page - 1)}
 				>
-					Previous
+					Prev
 				</Button>
 				<Button
-					variant="outline"
+					variant="ghost"
 					size="sm"
+					class="h-7 px-2 text-xs"
 					disabled={data.leaderboard.pagination.page >= data.leaderboard.pagination.totalPages}
 					onclick={() => handlePageChange(data.leaderboard.pagination.page + 1)}
 				>
