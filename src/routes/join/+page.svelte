@@ -81,7 +81,7 @@
 	<!-- Back link -->
 	<a
 		href={resolve('/')}
-		class="mb-8 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+		class="mb-8 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
 	>
 		<ArrowLeft class="h-3 w-3" />
 		Back to leaderboard
@@ -90,7 +90,7 @@
 	<!-- Header -->
 	<div class="mb-6">
 		<h1 class="text-lg font-semibold">Join CommitRank</h1>
-		<p class="mt-1 text-sm text-muted-foreground">
+		<p class="mt-1 text-muted-foreground">
 			Enter your GitHub username to see where you rank.
 		</p>
 	</div>
@@ -98,7 +98,7 @@
 	<!-- Error message -->
 	{#if form?.error}
 		<div
-			class="mb-4 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+			class="mb-4 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-destructive"
 		>
 			{form.message}
 		</div>
@@ -121,7 +121,7 @@
 	>
 		<!-- GitHub Username -->
 		<div class="space-y-1.5">
-			<label for="github_username" class="flex items-center gap-1.5 text-sm font-medium">
+			<label for="github_username" class="flex items-center gap-1.5 font-medium">
 				<Github class="h-3.5 w-3.5" />
 				GitHub Username
 			</label>
@@ -140,13 +140,13 @@
 				required
 			/>
 			{#if githubError}
-				<p class="text-xs text-destructive">{githubError}</p>
+				<p class="text-sm text-destructive">{githubError}</p>
 			{/if}
 		</div>
 
 		<!-- Twitter Handle -->
 		<div class="space-y-1.5">
-			<label for="twitter_handle" class="flex items-center gap-1.5 text-sm font-medium">
+			<label for="twitter_handle" class="flex items-center gap-1.5 font-medium">
 				<AtSign class="h-3.5 w-3.5" />
 				<span>X Handle</span>
 				<span class="font-normal text-muted-foreground">(optional)</span>
@@ -164,7 +164,7 @@
 				disabled={isSubmitting}
 			/>
 			{#if twitterError}
-				<p class="text-xs text-destructive">{twitterError}</p>
+				<p class="text-sm text-destructive">{twitterError}</p>
 			{/if}
 		</div>
 

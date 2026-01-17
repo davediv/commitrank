@@ -136,7 +136,7 @@
 					<CheckCircle class="h-4 w-4 text-primary" />
 					Welcome to CommitRank
 				</Dialog.Title>
-				<Dialog.Description class="text-sm">
+				<Dialog.Description>
 					<strong class="text-foreground">@{successMessage.username}</strong> joined at rank
 					<strong class="text-foreground">#{successMessage.rank}</strong>
 					with <strong class="text-primary">{formatNumber(successMessage.contributions)}</strong> contributions.
@@ -154,7 +154,7 @@
 	<div class="hero-glow"></div>
 	<div class="relative z-10 mx-auto max-w-3xl px-4 text-center">
 		<h1 class="hero-title text-3xl font-bold tracking-tight sm:text-4xl">CommitRank</h1>
-		<p class="mt-3 text-muted-foreground">GitHub Commit Leaderboard</p>
+		<p class="mt-3 text-muted-foreground font-mono">GitHub Commit Leaderboard</p>
 	</div>
 </div>
 
@@ -164,7 +164,7 @@
 		<div>
 			<h2 class="text-lg font-semibold">Leaderboard</h2>
 			{#if data.stats}
-				<div class="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+				<div class="mt-1 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
 					<span class="flex items-center gap-1">
 						<Users class="h-3 w-3" />
 						{formatNumber(data.stats.total_users)}
@@ -186,7 +186,7 @@
 			{#each periods as period (period.value)}
 				<button
 					onclick={() => handlePeriodChange(period.value)}
-					class="rounded px-3 py-1 text-xs font-medium transition-colors {data.period ===
+					class="rounded px-3 py-1 text-sm font-medium transition-colors {data.period ===
 					period.value
 						? 'bg-card text-foreground shadow-sm'
 						: 'text-muted-foreground hover:text-foreground'}"
@@ -201,7 +201,7 @@
 	<div class="overflow-hidden rounded-md border border-border">
 		<table class="w-full">
 			<thead>
-				<tr class="border-b border-border bg-muted/30 text-xs text-muted-foreground">
+				<tr class="border-b border-border bg-muted/30 text-sm text-muted-foreground">
 					<th class="w-12 py-2 text-center font-medium">#</th>
 					<th class="py-2 pl-2 text-left font-medium">Developer</th>
 					<th class="hidden w-32 py-2 text-right font-medium sm:table-cell">Twitter/X</th>
@@ -235,7 +235,7 @@
 					{/each}
 				{:else if data.leaderboard.leaderboard.length === 0}
 					<tr>
-						<td colspan={4} class="py-12 text-center text-sm text-muted-foreground">
+						<td colspan={4} class="py-12 text-center text-muted-foreground">
 							No developers yet.
 							<a href={resolve('/join')} class="text-primary hover:underline">Be the first</a>
 						</td>
@@ -251,7 +251,7 @@
 								{:else if entry.rank === 3}
 									<span class="rank-badge rank-badge-bronze">3</span>
 								{:else}
-									<span class="text-xs text-muted-foreground">{entry.rank}</span>
+									<span class="text-sm text-muted-foreground">{entry.rank}</span>
 								{/if}
 							</td>
 							<td class="py-2.5 pl-2">
@@ -274,7 +274,7 @@
 											href="https://github.com/{entry.github_username}"
 											target="_blank"
 											rel="noopener noreferrer"
-											class="group flex items-center gap-1 text-sm font-medium text-foreground hover:text-primary"
+											class="group flex items-center gap-1 font-medium text-foreground hover:text-primary"
 										>
 											{entry.github_username}
 											<ExternalLink
@@ -282,7 +282,7 @@
 											/>
 										</a>
 										{#if entry.display_name}
-											<p class="truncate text-xs text-muted-foreground">
+											<p class="truncate text-sm text-muted-foreground">
 												{entry.display_name}
 											</p>
 										{/if}
@@ -295,16 +295,16 @@
 										href="https://x.com/{entry.twitter_handle}"
 										target="_blank"
 										rel="noopener noreferrer"
-										class="text-xs text-muted-foreground hover:text-primary"
+										class="text-sm text-muted-foreground hover:text-primary"
 									>
 										@{entry.twitter_handle}
 									</a>
 								{:else}
-									<span class="text-xs text-muted-foreground/50">-</span>
+									<span class="text-sm text-muted-foreground/50">-</span>
 								{/if}
 							</td>
 							<td class="py-2.5 pr-4 text-right">
-								<span class="contrib-count text-sm font-medium">
+								<span class="contrib-count font-medium">
 									{formatNumber(entry.contributions)}
 								</span>
 							</td>
@@ -317,7 +317,7 @@
 
 	<!-- Pagination -->
 	{#if data.leaderboard.pagination.totalPages > 1}
-		<div class="mt-4 flex items-center justify-between text-xs">
+		<div class="mt-4 flex items-center justify-between text-sm">
 			<span class="text-muted-foreground">
 				Page {data.leaderboard.pagination.page} of {data.leaderboard.pagination.totalPages}
 			</span>
@@ -325,7 +325,7 @@
 				<Button
 					variant="ghost"
 					size="sm"
-					class="h-7 px-2 text-xs"
+					class="h-7 px-2 text-sm"
 					disabled={data.leaderboard.pagination.page <= 1}
 					onclick={() => handlePageChange(data.leaderboard.pagination.page - 1)}
 				>
@@ -334,7 +334,7 @@
 				<Button
 					variant="ghost"
 					size="sm"
-					class="h-7 px-2 text-xs"
+					class="h-7 px-2 text-sm"
 					disabled={data.leaderboard.pagination.page >= data.leaderboard.pagination.totalPages}
 					onclick={() => handlePageChange(data.leaderboard.pagination.page + 1)}
 				>

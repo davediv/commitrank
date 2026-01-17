@@ -18,11 +18,11 @@
 		class="sticky top-0 z-50 border-b border-border/50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
 	>
 		<div class="mx-auto flex h-12 max-w-3xl items-center justify-between px-4">
-			<a href={resolve('/')} class="flex items-center gap-2 text-sm font-medium text-foreground">
+			<a href={resolve('/')} class="flex items-center gap-2 font-medium text-foreground">
 				<Github class="h-5 w-5" />
 				<span>CommitRank</span>
 			</a>
-			<Button href={resolve('/join')} size="sm" class="h-7 px-3 text-xs">Join</Button>
+			<Button href={resolve('/join')} size="sm" class="h-7 px-3">Join</Button>
 		</div>
 	</header>
 
