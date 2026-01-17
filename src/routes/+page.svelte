@@ -149,11 +149,19 @@
 	</Dialog.Root>
 {/if}
 
+<!-- Hero Section -->
+<div class="border-b border-border/50 py-10">
+	<div class="mx-auto max-w-3xl px-4 text-center">
+		<h1 class="text-2xl font-bold tracking-tight sm:text-3xl">CommitRank</h1>
+		<p class="mt-2 text-muted-foreground">GitHub Commit Leaderboard</p>
+	</div>
+</div>
+
 <div class="mx-auto max-w-3xl px-4 py-6">
 	<!-- Header with stats -->
 	<div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 		<div>
-			<h1 class="text-lg font-semibold">Leaderboard</h1>
+			<h2 class="text-lg font-semibold">Leaderboard</h2>
 			{#if data.stats}
 				<div class="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
 					<span class="flex items-center gap-1">
@@ -195,6 +203,7 @@
 				<tr class="border-b border-border bg-muted/30 text-xs text-muted-foreground">
 					<th class="w-12 py-2 text-center font-medium">#</th>
 					<th class="py-2 pl-2 text-left font-medium">Developer</th>
+					<th class="hidden w-32 py-2 text-right font-medium sm:table-cell">Twitter/X</th>
 					<th class="w-24 py-2 pr-4 text-right font-medium">Commits</th>
 				</tr>
 			</thead>
@@ -215,6 +224,9 @@
 									</div>
 								</div>
 							</td>
+							<td class="hidden py-3 text-right sm:table-cell">
+								<Skeleton class="ml-auto h-4 w-16" />
+							</td>
 							<td class="py-3 pr-4 text-right">
 								<Skeleton class="ml-auto h-4 w-10" />
 							</td>
@@ -222,7 +234,7 @@
 					{/each}
 				{:else if data.leaderboard.leaderboard.length === 0}
 					<tr>
-						<td colspan={3} class="py-12 text-center text-sm text-muted-foreground">
+						<td colspan={4} class="py-12 text-center text-sm text-muted-foreground">
 							No developers yet.
 							<a href={resolve('/join')} class="text-primary hover:underline">Be the first</a>
 						</td>
@@ -275,6 +287,20 @@
 										{/if}
 									</div>
 								</div>
+							</td>
+							<td class="hidden py-2.5 text-right sm:table-cell">
+								{#if entry.twitter_handle}
+									<a
+										href="https://x.com/{entry.twitter_handle}"
+										target="_blank"
+										rel="noopener noreferrer"
+										class="text-xs text-muted-foreground hover:text-primary"
+									>
+										@{entry.twitter_handle}
+									</a>
+								{:else}
+									<span class="text-xs text-muted-foreground/50">-</span>
+								{/if}
 							</td>
 							<td class="py-2.5 pr-4 text-right">
 								<span class="contrib-count text-sm font-medium">
