@@ -35,7 +35,8 @@ export const GET: RequestHandler = async ({ params, platform }) => {
 		.limit(1);
 
 	if (userResult.length === 0 || !userResult[0].avatar_url) {
-		return new Response('User not found', { status: 404 });
+		// Fallback: redirect to GitHub avatar directly using username
+		return Response.redirect(`https://avatars.githubusercontent.com/${username}?s=128`, 302);
 	}
 
 	const avatarUrl = userResult[0].avatar_url;
