@@ -137,9 +137,7 @@
 					Welcome to CommitRank
 				</Dialog.Title>
 				<Dialog.Description>
-					<strong class="text-foreground">@{successMessage.username}</strong> joined at rank
-					<strong class="text-foreground">#{successMessage.rank}</strong>
-					with <strong class="text-primary">{formatNumber(successMessage.contributions)}</strong> contributions.
+					<strong class="text-foreground">@{successMessage.username}</strong> joined with <strong class="text-primary">{formatNumber(successMessage.contributions)}</strong> contributions.
 				</Dialog.Description>
 			</Dialog.Header>
 			<Dialog.Footer>
