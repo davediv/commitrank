@@ -9,6 +9,7 @@ import { fetchContributions, parseGitHubNodeId, GitHubApiError } from '$lib/serv
 import { invalidateLeaderboardCache, deleteCached, statsKey } from '$lib/server/cache';
 import { checkRateLimit, rateLimitKey, RATE_LIMITS } from '$lib/server/ratelimit';
 import { createLogger } from '$lib/server/logger';
+import { cacheAvatarInBackground } from '$lib/server/avatar';
 
 async function calculateUserRank(db: ReturnType<typeof createDb>, userId: string): Promise<number> {
 	const now = new Date();
@@ -242,6 +243,16 @@ export const actions: Actions = {
 			await Promise.all([invalidateLeaderboardCache(kv), deleteCached(kv, statsKey())]);
 			log.timeEnd('invalidate-cache');
 			log.info('Cache invalidated');
+
+			// Cache avatar in background (fire-and-forget)
+			if (githubData.user.avatarUrl && platform?.ctx) {
+				cacheAvatarInBackground(
+					platform.ctx,
+					kv,
+					insertedUser.github_username,
+					githubData.user.avatarUrl
+				);
+			}
 
 			// Store success info in a cookie for display after redirect
 			cookies.set(

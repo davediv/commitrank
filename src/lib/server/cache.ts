@@ -15,7 +15,9 @@ export const CACHE_TTL = {
 	/** GitHub API response cache - 1 hour */
 	GITHUB: 3600,
 	/** Stats cache - 6 hours (invalidated on sync/join) */
-	STATS: 21600
+	STATS: 21600,
+	/** Avatar cache - 7 days (refreshed on sync) */
+	AVATAR: 604800
 } as const;
 
 /**
@@ -26,7 +28,8 @@ export const CACHE_KEYS = {
 	USER: 'user',
 	GITHUB: 'github',
 	STATS: 'stats',
-	LAST_SYNC: 'last_sync'
+	LAST_SYNC: 'last_sync',
+	AVATAR: 'avatar'
 } as const;
 
 /**
@@ -62,6 +65,13 @@ export function statsKey(): string {
  */
 export function lastSyncKey(): string {
 	return CACHE_KEYS.LAST_SYNC;
+}
+
+/**
+ * Generate a cache key for avatar data
+ */
+export function avatarKey(username: string): string {
+	return `${CACHE_KEYS.AVATAR}:${username.toLowerCase()}`;
 }
 
 /**
@@ -164,4 +174,52 @@ export async function getOrSet<T>(
 	const value = await fetcher();
 	await setCached(kv, key, value, ttl);
 	return { value, cached: false };
+}
+
+/**
+ * Get binary data from KV cache (for avatars)
+ *
+ * @param kv - KVNamespace instance
+ * @param key - Cache key
+ * @returns ArrayBuffer or null if not found
+ */
+export async function getBinary(kv: KVNamespace, key: string): Promise<ArrayBuffer | null> {
+	return await kv.get(key, 'arrayBuffer');
+}
+
+/**
+ * Set binary data in KV cache with TTL (for avatars)
+ *
+ * @param kv - KVNamespace instance
+ * @param key - Cache key
+ * @param value - Binary data to cache
+ * @param ttl - Time to live in seconds
+ * @param metadata - Optional metadata to store with the value
+ */
+export async function setBinary(
+	kv: KVNamespace,
+	key: string,
+	value: ArrayBuffer,
+	ttl: number,
+	metadata?: Record<string, string>
+): Promise<void> {
+	await kv.put(key, value, { expirationTtl: ttl, metadata });
+}
+
+/**
+ * Get binary data with metadata from KV cache (for avatars)
+ *
+ * @param kv - KVNamespace instance
+ * @param key - Cache key
+ * @returns Object with value and metadata, or null if not found
+ */
+export async function getBinaryWithMetadata(
+	kv: KVNamespace,
+	key: string
+): Promise<{ value: ArrayBuffer; metadata: Record<string, string> | null } | null> {
+	const result = await kv.getWithMetadata<Record<string, string>>(key, 'arrayBuffer');
+	if (result.value === null) {
+		return null;
+	}
+	return { value: result.value, metadata: result.metadata };
 }

@@ -76,9 +76,8 @@
 		return new Intl.NumberFormat().format(num);
 	}
 
-	function getAvatarUrl(url: string | null, size: number = 64): string {
-		if (!url) return '';
-		return url.includes('?') ? `${url}&s=${size}` : `${url}?s=${size}`;
+	function getAvatarUrl(username: string): string {
+		return `/api/avatar/${username}`;
 	}
 
 	function formatRelativeTime(isoString: string | null): string {
@@ -154,7 +153,7 @@
 	<div class="hero-glow"></div>
 	<div class="relative z-10 mx-auto max-w-3xl px-4 text-center">
 		<h1 class="hero-title text-3xl font-bold tracking-tight sm:text-4xl">CommitRank</h1>
-		<p class="mt-3 text-muted-foreground font-mono">GitHub Commit Leaderboard</p>
+		<p class="mt-3 font-mono text-muted-foreground">GitHub Commit Leaderboard</p>
 	</div>
 </div>
 
@@ -258,7 +257,7 @@
 								<div class="flex items-center gap-2.5">
 									<Avatar.Root class="h-8 w-8">
 										<Avatar.Image
-											src={getAvatarUrl(entry.avatar_url)}
+											src={getAvatarUrl(entry.github_username)}
 											alt={entry.github_username}
 											loading="lazy"
 											decoding="async"
