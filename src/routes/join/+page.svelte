@@ -90,9 +90,7 @@
 	<!-- Header -->
 	<div class="mb-6">
 		<h1 class="text-lg font-semibold">Join CommitRank</h1>
-		<p class="mt-1 text-muted-foreground">
-			Enter your GitHub username to see where you rank.
-		</p>
+		<p class="mt-1 text-muted-foreground">Enter your GitHub username to see where you rank.</p>
 	</div>
 
 	<!-- Error message -->
