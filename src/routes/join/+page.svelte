@@ -73,6 +73,7 @@
 </script>
 
 <svelte:head>
+	<link rel="canonical" href="https://commitrank.dev/join" />
 	<title>Join - CommitRank</title>
 	<meta name="description" content="Join the CommitRank leaderboard and see where you rank." />
 </svelte:head>

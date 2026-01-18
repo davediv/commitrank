@@ -107,6 +107,7 @@
 
 <!-- SEO Meta Tags -->
 <svelte:head>
+	<link rel="canonical" href="https://commitrank.dev/" />
 	<title>CommitRank - GitHub Commit Leaderboard</title>
 	<meta
 		name="description"
