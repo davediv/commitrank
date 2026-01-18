@@ -111,7 +111,6 @@
 			}
 			isSubmitting = true;
 			return async ({ update }) => {
-				isSubmitting = false;
 				await update();
 			};
 		}}
