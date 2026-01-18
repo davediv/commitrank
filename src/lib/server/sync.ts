@@ -16,6 +16,7 @@ import {
 	lastSyncKey,
 	setCached
 } from './cache';
+import { fetchAndCacheAvatar } from './avatar';
 
 /**
  * Result of syncing a single user
@@ -57,6 +58,7 @@ const BATCH_SIZE = 250;
  * Sync contributions for a single user
  *
  * @param db - Database instance
+ * @param kv - KV namespace for avatar caching
  * @param userId - User ID to sync
  * @param username - GitHub username
  * @param token - GitHub API token
@@ -64,6 +66,7 @@ const BATCH_SIZE = 250;
  */
 async function syncUserContributions(
 	db: ReturnType<typeof createDb>,
+	kv: KVNamespace<string>,
 	userId: string,
 	username: string,
 	token: string
@@ -123,6 +126,13 @@ async function syncUserContributions(
 				updated_at: new Date().toISOString()
 			})
 			.where(eq(users.id, userId));
+
+		// Cache avatar in KV (fire-and-forget, don't block on failure)
+		if (githubData.user.avatarUrl) {
+			fetchAndCacheAvatar(kv, username, githubData.user.avatarUrl).catch(() => {
+				// Silently ignore avatar cache failures
+			});
+		}
 
 		return {
 			username,
@@ -205,7 +215,7 @@ export async function runScheduledSync(
 
 	for (let i = 0; i < usersToSync.length; i++) {
 		const user = usersToSync[i];
-		const result = await syncUserContributions(db, user.id, user.github_username, token);
+		const result = await syncUserContributions(db, kv, user.id, user.github_username, token);
 
 		if (result.success) {
 			successCount++;
