@@ -1,7 +1,6 @@
 export {
 	validateGitHubUser,
 	fetchContributions,
-	parseGitHubNodeId,
 	GitHubApiError,
 	type GitHubErrorType,
 	type GitHubUser,

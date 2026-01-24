@@ -21,7 +21,6 @@ vi.mock('$lib/server/ratelimit', () => ({
 
 vi.mock('$lib/server/github', () => ({
 	fetchContributions: vi.fn(),
-	parseGitHubNodeId: vi.fn(() => 12345),
 	GitHubApiError: class GitHubApiError extends Error {
 		type: string;
 		statusCode?: number;
@@ -150,6 +149,7 @@ function createMockDb(existingUsers: { id: string }[] = []) {
 const mockGitHubData = {
 	user: {
 		id: 'MDQ6VXNlcjEyMzQ1',
+		databaseId: 12345,
 		login: 'testuser',
 		name: 'Test User',
 		avatarUrl: 'https://avatars.githubusercontent.com/u/12345',

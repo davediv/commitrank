@@ -10,7 +10,7 @@ import {
 	type CreateUserRequest
 } from '$lib/types';
 import { isValidGitHubUsername, isValidTwitterHandle } from '$lib/validation';
-import { fetchContributions, parseGitHubNodeId, GitHubApiError } from '$lib/server/github';
+import { fetchContributions, GitHubApiError } from '$lib/server/github';
 import { invalidateLeaderboardCache, deleteCached, statsKey } from '$lib/server/cache';
 import { checkRateLimit, rateLimitKey, RATE_LIMITS } from '$lib/server/ratelimit';
 
@@ -136,8 +136,8 @@ export const POST: RequestHandler = async ({ request, platform, getClientAddress
 	try {
 		const githubData = await fetchContributions(github_username, githubToken);
 
-		// Parse GitHub numeric ID from node ID
-		const githubId = parseGitHubNodeId(githubData.user.id);
+		// Get GitHub numeric ID directly from GraphQL response
+		const githubId = githubData.user.databaseId;
 
 		// Insert new user
 		const newUser = await db
