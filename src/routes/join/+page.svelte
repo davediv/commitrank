@@ -111,8 +111,12 @@
 				return;
 			}
 			isSubmitting = true;
-			return async ({ update }) => {
+			return async ({ update, result }) => {
 				await update();
+				// Reset loading state on error (success redirects, so this only runs on errors)
+				if (result.type === 'failure' || result.type === 'error') {
+					isSubmitting = false;
+				}
 			};
 		}}
 		class="space-y-4"
