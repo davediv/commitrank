@@ -58,6 +58,7 @@ export interface GitHubContributionData {
 	user: {
 		login: string;
 		id: string;
+		databaseId: number;
 		name: string | null;
 		avatarUrl: string;
 		bio: string | null;
@@ -89,6 +90,7 @@ query GetUserContributions($username: String!) {
   user(login: $username) {
     login
     id
+    databaseId
     name
     avatarUrl
     bio
@@ -212,6 +214,7 @@ export async function fetchContributions(
 			user: {
 				login: string;
 				id: string;
+				databaseId: number;
 				name: string | null;
 				avatarUrl: string;
 				bio: string | null;
@@ -271,6 +274,7 @@ export async function fetchContributions(
 		user: {
 			login: user.login,
 			id: user.id,
+			databaseId: user.databaseId,
 			name: user.name,
 			avatarUrl: user.avatarUrl,
 			bio: user.bio,
@@ -293,25 +297,4 @@ export async function fetchContributions(
 			days
 		}
 	};
-}
-
-/**
- * Extract numeric GitHub ID from GraphQL node ID
- * GraphQL returns ID like "MDQ6VXNlcjEyMzQ1Njc4" which is base64 encoded
- *
- * @param nodeId - GraphQL node ID
- * @returns Numeric user ID or 0 if parsing fails
- */
-export function parseGitHubNodeId(nodeId: string): number {
-	try {
-		// Try to decode base64 - the format is like "04:User123456789"
-		const decoded = atob(nodeId);
-		const match = decoded.match(/User(\d+)/);
-		if (match) {
-			return parseInt(match[1], 10);
-		}
-	} catch {
-		// Ignore decode errors
-	}
-	return 0;
 }

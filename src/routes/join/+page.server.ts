@@ -5,7 +5,7 @@ import { users, contributions } from '$lib/server/db/schema';
 import { eq, sql, desc, and } from 'drizzle-orm';
 import { API_ERROR_CODES } from '$lib/types';
 import { isValidGitHubUsername, isValidTwitterHandle } from '$lib/validation';
-import { fetchContributions, parseGitHubNodeId, GitHubApiError } from '$lib/server/github';
+import { fetchContributions, GitHubApiError } from '$lib/server/github';
 import { invalidateLeaderboardCache, deleteCached, statsKey } from '$lib/server/cache';
 import { checkRateLimit, rateLimitKey, RATE_LIMITS } from '$lib/server/ratelimit';
 import { createLogger } from '$lib/server/logger';
@@ -134,7 +134,7 @@ export const actions: Actions = {
 				daysWithData: githubData.contributions.days.length
 			});
 
-			const githubId = parseGitHubNodeId(githubData.user.id);
+			const githubId = githubData.user.databaseId;
 
 			// Insert new user
 			log.time('insert-user');
