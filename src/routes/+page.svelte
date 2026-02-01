@@ -3,7 +3,14 @@
 	import { navigating, page } from '$app/stores';
 	import { resolve } from '$app/paths';
 	import { onMount } from 'svelte';
-	import { ExternalLink, Users, GitCommitHorizontal, Clock, CheckCircle } from '@lucide/svelte';
+	import {
+		ExternalLink,
+		Users,
+		GitCommitHorizontal,
+		Clock,
+		CheckCircle,
+		RefreshCw
+	} from '@lucide/svelte';
 	import * as Avatar from '$lib/components/ui/avatar';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Button } from '$lib/components/ui/button';
@@ -96,6 +103,42 @@
 		return `${diffDays}d ago`;
 	}
 
+	function formatTimeUntil(isoString: string | null): string {
+		if (!isoString) return 'Unknown';
+
+		const target = new Date(isoString);
+		const now = new Date();
+		const diffMs = target.getTime() - now.getTime();
+
+		if (diffMs <= 0) return 'Soon';
+
+		const diffMins = Math.floor(diffMs / 60000);
+		const diffHours = Math.floor(diffMins / 60);
+		const remainingMins = diffMins % 60;
+
+		if (diffHours >= 1) {
+			return remainingMins > 0 ? `${diffHours}h ${remainingMins}m` : `${diffHours}h`;
+		}
+		return `${diffMins}m`;
+	}
+
+	function formatUTCTime(isoString: string | null): string {
+		if (!isoString) return 'Never';
+
+		const date = new Date(isoString);
+		return (
+			date.toLocaleString('en-US', {
+				month: 'short',
+				day: 'numeric',
+				year: 'numeric',
+				hour: '2-digit',
+				minute: '2-digit',
+				timeZone: 'UTC',
+				hour12: false
+			}) + ' UTC'
+		);
+	}
+
 	// Period tabs configuration
 	const periods = [
 		{ value: 'today', label: 'Today' },
@@ -168,15 +211,31 @@
 						<Users class="h-3 w-3" />
 						{formatNumber(data.stats.total_users)}
 					</span>
-					<span class="flex items-center gap-1">
+					<span
+						class="flex items-center gap-1"
+						title="Contributions for {new Date().toISOString().split('T')[0]} (UTC date)"
+					>
 						<GitCommitHorizontal class="h-3 w-3" />
 						{formatNumber(data.stats.total_contributions_today)} today
 					</span>
-					<span class="flex items-center gap-1" title={data.stats.last_sync || 'Never'}>
+					<span
+						class="flex items-center gap-1"
+						title="Last synced: {formatUTCTime(data.stats.last_sync)}"
+					>
 						<Clock class="h-3 w-3" />
 						{formatRelativeTime(data.stats.last_sync)}
 					</span>
+					<span
+						class="flex items-center gap-1"
+						title="Next sync: {formatUTCTime(data.stats.next_sync)}"
+					>
+						<RefreshCw class="h-3 w-3" />
+						{formatTimeUntil(data.stats.next_sync)}
+					</span>
 				</div>
+				<p class="mt-1 text-xs text-muted-foreground/70">
+					Data syncs every 6h. "Today" = UTC date.
+				</p>
 			{/if}
 		</div>
 
