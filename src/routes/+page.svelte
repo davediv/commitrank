@@ -15,6 +15,7 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Button } from '$lib/components/ui/button';
 	import { Skeleton } from '$lib/components/ui/skeleton';
+	import { formatUTCClockTime } from '$lib/time';
 	import type { PageData } from './$types';
 
 	interface Props {
@@ -42,6 +43,8 @@
 	let successMessage: { username: string; rank: number; contributions: number } | null =
 		$state(null);
 	let showSuccessModal = $state(false);
+	let utcNow: Date | null = $state(null);
+	const utcNowLabel = $derived(utcNow ? formatUTCClockTime(utcNow) : '--:--:-- UTC');
 
 	onMount(() => {
 		// Check for join_success cookie
@@ -60,6 +63,18 @@
 				break;
 			}
 		}
+	});
+
+	onMount(() => {
+		utcNow = new Date();
+
+		const timer = window.setInterval(() => {
+			utcNow = new Date();
+		}, 1000);
+
+		return () => {
+			window.clearInterval(timer);
+		};
 	});
 
 	function dismissSuccess() {
@@ -233,9 +248,16 @@
 						{formatTimeUntil(data.stats.next_sync)}
 					</span>
 				</div>
-				<p class="mt-1 text-xs text-muted-foreground/70">
-					Data syncs every 6h. "Today" = UTC date.
-				</p>
+				<div class="mt-1 space-y-0.5 text-xs text-muted-foreground/70">
+					<p
+						class="font-mono text-muted-foreground/80"
+						aria-label="Current UTC time"
+						title="Current UTC time (updates every second)"
+					>
+						UTC now: {utcNowLabel}
+					</p>
+					<p>Today resets at 00:00 UTC. Sync runs hourly.</p>
+				</div>
 			{/if}
 		</div>
 

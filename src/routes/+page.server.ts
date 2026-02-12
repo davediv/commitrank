@@ -3,6 +3,7 @@ import { createDb } from '$lib/server/db';
 import { users, contributions } from '$lib/server/db/schema';
 import { eq, sql, desc, and, gte } from 'drizzle-orm';
 import { getCached, setCached, leaderboardKey, lastSyncKey, CACHE_TTL } from '$lib/server/cache';
+import { calculateNextHourlySync } from '$lib/server/sync-config';
 import type {
 	ContributionPeriod,
 	LeaderboardEntry,
@@ -39,26 +40,6 @@ function getDateRange(period: ContributionPeriod): { startDate: string; endDate:
 	}
 
 	return { startDate, endDate };
-}
-
-/**
- * Calculate next sync time (every 6 hours at 0, 6, 12, 18 UTC)
- */
-function calculateNextSync(): string {
-	const now = new Date();
-	const currentHour = now.getUTCHours();
-
-	const syncHours = [0, 6, 12, 18];
-	const nextSyncHour = syncHours.find((h) => h > currentHour) ?? 24 + syncHours[0];
-
-	const nextSync = new Date(now);
-	nextSync.setUTCHours(nextSyncHour % 24, 0, 0, 0);
-
-	if (nextSyncHour >= 24) {
-		nextSync.setUTCDate(nextSync.getUTCDate() + 1);
-	}
-
-	return nextSync.toISOString();
 }
 
 export const load: PageServerLoad = async ({ url, platform, setHeaders }) => {
@@ -190,7 +171,7 @@ export const load: PageServerLoad = async ({ url, platform, setHeaders }) => {
 			total_contributions_today: Number(todayContribResult[0]?.total || 0),
 			total_contributions_year: 0, // Not needed for display
 			last_sync: lastSync,
-			next_sync: calculateNextSync()
+			next_sync: calculateNextHourlySync()
 		};
 	} catch {
 		// Stats are optional, continue without them
