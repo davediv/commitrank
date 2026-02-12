@@ -17,6 +17,11 @@ import {
 	setCached
 } from './cache';
 import { fetchAndCacheAvatar } from './avatar';
+import {
+	DEFAULT_SYNC_BATCH_SIZE,
+	DEFAULT_SYNC_REQUEST_DELAY_MS,
+	type SyncRuntimeConfig
+} from './sync-config';
 
 /**
  * Result of syncing a single user
@@ -41,18 +46,11 @@ interface SyncSummary {
 	durationMs: number;
 }
 
-/**
- * Delay between API requests to respect rate limits
- * GitHub allows 5,000 requests/hour with auth, but we're conservative
- */
-const REQUEST_DELAY_MS = 100;
-
-/**
- * Maximum number of users to sync per cron run
- * With 4 cron runs/day (every 6 hours), this allows ~1000 users/day
- * This prevents Worker CPU timeout (30s limit) on large user bases
- */
-const BATCH_SIZE = 250;
+export interface RunScheduledSyncOptions extends SyncRuntimeConfig {
+	trigger: 'api' | 'scheduled';
+	cron?: string;
+	scheduledTime?: string;
+}
 
 /**
  * Sync contributions for a single user
@@ -186,10 +184,14 @@ function sleep(ms: number): Promise<void> {
 export async function runScheduledSync(
 	dbBinding: D1Database,
 	kv: KVNamespace<string>,
-	token: string
+	token: string,
+	options?: Partial<RunScheduledSyncOptions>
 ): Promise<SyncSummary> {
 	const startTime = Date.now();
 	const db = createDb(dbBinding);
+	const batchSize = options?.batchSize ?? DEFAULT_SYNC_BATCH_SIZE;
+	const requestDelayMs = options?.requestDelayMs ?? DEFAULT_SYNC_REQUEST_DELAY_MS;
+	const trigger = options?.trigger ?? 'api';
 
 	// Count total users in database
 	const countResult = await db.select({ count: users.id }).from(users);
@@ -203,14 +205,23 @@ export async function runScheduledSync(
 		})
 		.from(users)
 		.orderBy(asc(users.updated_at))
-		.limit(BATCH_SIZE);
+		.limit(batchSize);
 
 	const results: SyncResult[] = [];
 	let successCount = 0;
 	let failureCount = 0;
 
 	console.log(
-		`[Sync] Starting batched sync: ${usersToSync.length}/${totalUsersInDb} users (batch size: ${BATCH_SIZE})`
+		JSON.stringify({
+			event: 'sync_start',
+			trigger,
+			cron: options?.cron,
+			scheduledTime: options?.scheduledTime,
+			totalUsersInDb,
+			batchSize,
+			requestDelayMs,
+			usersSelected: usersToSync.length
+		})
 	);
 
 	for (let i = 0; i < usersToSync.length; i++) {
@@ -229,7 +240,7 @@ export async function runScheduledSync(
 
 		// Delay between requests to respect rate limits
 		if (i < usersToSync.length - 1) {
-			await sleep(REQUEST_DELAY_MS);
+			await sleep(requestDelayMs);
 		}
 	}
 
@@ -245,12 +256,24 @@ export async function runScheduledSync(
 	const durationMs = Date.now() - startTime;
 
 	console.log(
-		`[Sync] Completed in ${Math.round(durationMs / 1000)}s: ${successCount}/${usersToSync.length} success, ${failureCount} failed (${totalUsersInDb} total users)`
+		JSON.stringify({
+			event: 'sync_complete',
+			trigger,
+			cron: options?.cron,
+			scheduledTime: options?.scheduledTime,
+			totalUsersInDb,
+			usersSynced: usersToSync.length,
+			successCount,
+			failureCount,
+			durationMs,
+			batchSize,
+			requestDelayMs
+		})
 	);
 
 	return {
 		totalUsersInDb,
-		batchSize: BATCH_SIZE,
+		batchSize,
 		syncedCount: usersToSync.length,
 		successCount,
 		failureCount,

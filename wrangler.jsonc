@@ -47,10 +47,12 @@
 	 *
 	 * Required Secrets (set via `wrangler secret put <NAME>`):
 	 * - GITHUB_TOKEN: GitHub Personal Access Token with read:user scope
-	 * - CRON_SECRET: Secret key for authenticating scheduled sync API calls
+	 * - CRON_SECRET: Secret key for authenticating manual /api/sync API calls
 	 */
 	"vars": {
-		"ENVIRONMENT": "production"
+		"ENVIRONMENT": "production",
+		"SYNC_BATCH_SIZE": "75",
+		"SYNC_REQUEST_DELAY_MS": "100"
 	}
 
 	/**

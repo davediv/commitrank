@@ -2,7 +2,7 @@
  * Internal API endpoint for scheduled sync
  *
  * This endpoint triggers the batched sync of user contributions.
- * It's designed to be called by Cloudflare Cron Triggers or an external cron service.
+ * It's kept as a manual/admin fallback trigger.
  * Uses batching to prevent Worker CPU timeout on large user bases.
  *
  * Security: Protected by CRON_SECRET environment variable.
@@ -11,14 +11,14 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { runScheduledSync } from '$lib/server/sync';
+import { getSyncRuntimeConfig } from '$lib/server/sync-config';
 
 /**
  * GET /api/sync
  *
  * Triggers the batched sync for users (oldest updated first).
  * Requires Authorization header with Bearer token matching CRON_SECRET.
- *
- * Can also be triggered by Cloudflare Workers scheduled event via /__scheduled route.
+ * Intended for manual/admin fallback triggering.
  */
 export const GET: RequestHandler = async ({ request, platform }) => {
 	// Verify authorization
@@ -49,13 +49,25 @@ export const GET: RequestHandler = async ({ request, platform }) => {
 		throw error(500, 'GitHub token not configured');
 	}
 
-	console.log('[Sync API] Starting scheduled sync...');
+	console.log('[Sync API] Starting manual sync...');
 
 	try {
-		const summary = await runScheduledSync(db, kv, githubToken);
+		const syncConfig = getSyncRuntimeConfig(platform?.env);
+		const summary = await runScheduledSync(db, kv, githubToken, {
+			...syncConfig,
+			trigger: 'api'
+		});
 
 		console.log(
-			`[Sync API] Sync completed: ${summary.successCount}/${summary.syncedCount} succeeded in ${Math.round(summary.durationMs / 1000)}s (${summary.totalUsersInDb} total users)`
+			JSON.stringify({
+				event: 'sync_api_complete',
+				successCount: summary.successCount,
+				syncedCount: summary.syncedCount,
+				failureCount: summary.failureCount,
+				durationMs: summary.durationMs,
+				totalUsersInDb: summary.totalUsersInDb,
+				batchSize: summary.batchSize
+			})
 		);
 
 		return json({
