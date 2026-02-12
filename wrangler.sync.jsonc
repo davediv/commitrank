@@ -1,0 +1,35 @@
+/**
+ * Cloudflare Worker dedicated to scheduled contribution sync.
+ * This worker is triggered by native Cron Triggers (no external HTTP cron required).
+ */
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "commitrank-sync",
+	"main": "src/sync-worker.ts",
+	"compatibility_date": "2025-09-27",
+	"compatibility_flags": ["nodejs_als"],
+	"observability": {
+		"enabled": true
+	},
+	"triggers": {
+		"crons": ["0 * * * *"]
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "commitrank-db",
+			"database_id": "5f01bfe2-b370-4638-8af8-512f29439226"
+		}
+	],
+	"kv_namespaces": [
+		{
+			"binding": "KV",
+			"id": "f7621d8e20f74c8fad89e5b92e63d809"
+		}
+	],
+	"vars": {
+		"ENVIRONMENT": "production",
+		"SYNC_BATCH_SIZE": "75",
+		"SYNC_REQUEST_DELAY_MS": "100"
+	}
+}

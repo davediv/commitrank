@@ -8,3 +8,7 @@ ENVIRONMENT=development
 # GitHub Personal Access Token with read:user scope
 # Create one at: https://github.com/settings/tokens
 GITHUB_TOKEN=your_github_token_here
+
+# Optional sync tuning (used by manual /api/sync endpoint in local dev)
+SYNC_BATCH_SIZE=75
+SYNC_REQUEST_DELAY_MS=100

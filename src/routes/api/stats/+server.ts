@@ -10,28 +10,7 @@ import {
 	type StatsResponse
 } from '$lib/types';
 import { getCached, setCached, statsKey, CACHE_TTL } from '$lib/server/cache';
-
-/**
- * Calculate the next sync time based on cron schedule (every 6 hours)
- * Cron expression: 0 0,6,12,18 * * *
- */
-function calculateNextSync(): string {
-	const now = new Date();
-	const currentHour = now.getUTCHours();
-
-	// Sync happens at 0, 6, 12, 18 UTC
-	const syncHours = [0, 6, 12, 18];
-	const nextSyncHour = syncHours.find((h) => h > currentHour) ?? 24 + syncHours[0];
-
-	const nextSync = new Date(now);
-	nextSync.setUTCHours(nextSyncHour % 24, 0, 0, 0);
-
-	if (nextSyncHour >= 24) {
-		nextSync.setUTCDate(nextSync.getUTCDate() + 1);
-	}
-
-	return nextSync.toISOString();
-}
+import { calculateNextHourlySync } from '$lib/server/sync-config';
 
 export const GET: RequestHandler = async ({ platform }) => {
 	try {
@@ -85,7 +64,7 @@ export const GET: RequestHandler = async ({ platform }) => {
 			total_contributions_today: Number(todayContribResult[0]?.total || 0),
 			total_contributions_year: Number(yearContribResult[0]?.total || 0),
 			last_sync: lastSyncResult[0]?.updated_at || null,
-			next_sync: calculateNextSync()
+			next_sync: calculateNextHourlySync()
 		};
 
 		// Cache the response
