@@ -139,6 +139,24 @@ describe('/+page.svelte - Leaderboard Page', () => {
 			await expect.element(page.getByText('5,000 contributions today')).toBeInTheDocument();
 		});
 
+		it('should display UTC now label when stats are available', async () => {
+			render(Page, { props: { data: mockLeaderboardData } });
+
+			await expect.element(page.getByText(/UTC now:/)).toBeInTheDocument();
+		});
+
+		it('should display UTC reset hint text', async () => {
+			render(Page, { props: { data: mockLeaderboardData } });
+
+			await expect.element(page.getByText('Today resets at 00:00 UTC.')).toBeInTheDocument();
+		});
+
+		it('should display hourly sync cadence text', async () => {
+			render(Page, { props: { data: mockLeaderboardData } });
+
+			await expect.element(page.getByText('Sync runs hourly.')).toBeInTheDocument();
+		});
+
 		it('should not display stats when not available', async () => {
 			render(Page, { props: { data: mockEmptyData } });
 
