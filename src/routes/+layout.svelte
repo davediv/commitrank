@@ -2,6 +2,7 @@
 	import './layout.css';
 	import favicon from '$lib/assets/favicon.svg';
 	import { Button } from '$lib/components/ui/button';
+	import { Toaster } from '$lib/components/ui/sonner';
 	import { Github } from '@lucide/svelte';
 	import { resolve } from '$app/paths';
 
@@ -12,6 +13,7 @@
 	<link rel="icon" href={favicon} />
 </svelte:head>
 
+<Toaster theme="dark" />
 <div class="flex min-h-screen flex-col">
 	<!-- Minimal header -->
 	<header

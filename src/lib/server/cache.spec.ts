@@ -47,7 +47,7 @@ describe('Cache Utilities', () => {
 		});
 
 		it('should have correct USER TTL', () => {
-			expect(CACHE_TTL.USER).toBe(600);
+			expect(CACHE_TTL.USER).toBe(86400);
 		});
 
 		it('should have correct GITHUB TTL', () => {

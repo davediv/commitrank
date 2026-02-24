@@ -92,8 +92,8 @@ export interface PeriodContribution {
  * User profile data returned by API
  */
 export interface UserProfile {
-	/** Database ID */
-	id: number;
+	/** Database ID (UUID) */
+	id: string;
 	/** GitHub username */
 	github_username: string;
 	/** GitHub user ID */
@@ -126,6 +126,26 @@ export interface UserProfile {
 	updated_at: string;
 	/** Contribution data for all periods */
 	contributions: PeriodContribution[];
+}
+
+/**
+ * Daily contribution data for charts and heatmaps
+ */
+export interface ContributionDayData {
+	/** Date in YYYY-MM-DD format */
+	date: string;
+	/** Total contributions for the day */
+	count: number;
+}
+
+/**
+ * Profile page data (cached in KV as a single payload)
+ */
+export interface ProfilePageData {
+	/** User profile with period contributions and ranks */
+	profile: UserProfile;
+	/** Daily contribution data for the past year */
+	dailyContributions: ContributionDayData[];
 }
 
 /**

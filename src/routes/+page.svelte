@@ -3,14 +3,7 @@
 	import { navigating, page } from '$app/stores';
 	import { resolve } from '$app/paths';
 	import { onMount } from 'svelte';
-	import {
-		ExternalLink,
-		Users,
-		GitCommitHorizontal,
-		Clock,
-		CheckCircle,
-		RefreshCw
-	} from '@lucide/svelte';
+	import { Users, GitCommitHorizontal, Clock, CheckCircle, RefreshCw } from '@lucide/svelte';
 	import * as Avatar from '$lib/components/ui/avatar';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Button } from '$lib/components/ui/button';
@@ -351,15 +344,10 @@
 									</Avatar.Root>
 									<div class="min-w-0 flex-1">
 										<a
-											href="https://github.com/{entry.github_username}"
-											target="_blank"
-											rel="noopener noreferrer"
-											class="group flex items-center gap-1 font-medium text-foreground hover:text-primary"
+											href={resolve(`/${entry.github_username}`)}
+											class="font-medium text-foreground hover:text-primary"
 										>
 											{entry.github_username}
-											<ExternalLink
-												class="h-3 w-3 opacity-0 transition-opacity group-hover:opacity-50"
-											/>
 										</a>
 										{#if entry.display_name}
 											<p class="truncate text-sm text-muted-foreground">
