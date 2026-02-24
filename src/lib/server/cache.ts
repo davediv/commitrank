@@ -10,8 +10,8 @@
 export const CACHE_TTL = {
 	/** Leaderboard cache - 6 hours (invalidated on sync/join) */
 	LEADERBOARD: 21600,
-	/** Individual user cache - 10 minutes */
-	USER: 600,
+	/** Individual user/profile cache - 24 hours (invalidated on sync/join) */
+	USER: 86400,
 	/** GitHub API response cache - 1 hour */
 	GITHUB: 3600,
 	/** Stats cache - 6 hours (invalidated on sync/join) */
@@ -26,6 +26,7 @@ export const CACHE_TTL = {
 export const CACHE_KEYS = {
 	LEADERBOARD: 'leaderboard',
 	USER: 'user',
+	PROFILE: 'profile',
 	GITHUB: 'github',
 	STATS: 'stats',
 	LAST_SYNC: 'last_sync',
@@ -40,10 +41,17 @@ export function leaderboardKey(period: string, page: number, limit: number): str
 }
 
 /**
- * Generate a cache key for user data
+ * Generate a cache key for user data (API endpoint)
  */
 export function userKey(username: string): string {
 	return `${CACHE_KEYS.USER}:${username.toLowerCase()}`;
+}
+
+/**
+ * Generate a cache key for profile page data (SSR)
+ */
+export function profilePageKey(username: string): string {
+	return `${CACHE_KEYS.PROFILE}:${username.toLowerCase()}`;
 }
 
 /**
@@ -148,7 +156,10 @@ export async function invalidateLeaderboardCache(kv: KVNamespace): Promise<void>
  * @param username - GitHub username
  */
 export async function invalidateUserCache(kv: KVNamespace, username: string): Promise<void> {
-	await deleteCached(kv, userKey(username));
+	await Promise.all([
+		deleteCached(kv, userKey(username)),
+		deleteCached(kv, profilePageKey(username))
+	]);
 }
 
 /**

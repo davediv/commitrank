@@ -11,6 +11,8 @@ import { eq, asc, and } from 'drizzle-orm';
 import { fetchContributions, GitHubApiError } from './github';
 import {
 	invalidateLeaderboardCache,
+	invalidateByPrefix,
+	CACHE_KEYS,
 	deleteCached,
 	statsKey,
 	lastSyncKey,
@@ -248,6 +250,8 @@ export async function runScheduledSync(
 	const syncCompletedAt = new Date().toISOString();
 	await Promise.all([
 		invalidateLeaderboardCache(kv),
+		invalidateByPrefix(kv, CACHE_KEYS.USER),
+		invalidateByPrefix(kv, CACHE_KEYS.PROFILE),
 		deleteCached(kv, statsKey()),
 		// Store last sync timestamp (TTL: 24 hours - long enough to survive between syncs)
 		setCached(kv, lastSyncKey(), syncCompletedAt, 86400)
