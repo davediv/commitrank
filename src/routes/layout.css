@@ -1,5 +1,4 @@
 @import 'tailwindcss';
-@import 'tw-animate-css';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -189,7 +188,7 @@
 		radial-gradient(ellipse 80% 50% at 50% -20%, rgba(120, 119, 198, 0.15), transparent),
 		radial-gradient(ellipse 60% 40% at 20% 60%, rgba(45, 212, 191, 0.1), transparent),
 		radial-gradient(ellipse 60% 40% at 80% 60%, rgba(168, 85, 247, 0.1), transparent);
-	animation: hero-pulse 16s ease-in-out infinite;
+	opacity: 0.8;
 }
 
 @keyframes hero-pulse {
@@ -217,7 +216,7 @@
 	-webkit-background-clip: text;
 	background-clip: text;
 	color: transparent;
-	animation: gradient-shift 12s ease-in-out infinite;
+	background-position: 50% 50%;
 }
 
 @keyframes gradient-shift {
@@ -228,4 +227,25 @@
 	50% {
 		background-position: 100% 50%;
 	}
+}
+
+@media (prefers-reduced-motion: no-preference) and (min-width: 640px) {
+	.hero-glow {
+		animation: hero-pulse 16s ease-in-out infinite;
+	}
+
+	.hero-title {
+		animation: gradient-shift 12s ease-in-out infinite;
+	}
+}
+
+.success-dialog::backdrop {
+	background: rgb(0 0 0 / 0.55);
+	backdrop-filter: blur(2px);
+}
+
+/* Skip paint/layout for heavy profile visualizations until they approach view. */
+.deferred-section {
+	content-visibility: auto;
+	contain-intrinsic-size: auto 220px;
 }

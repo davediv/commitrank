@@ -78,8 +78,9 @@ export function lastSyncKey(): string {
 /**
  * Generate a cache key for avatar data
  */
-export function avatarKey(username: string): string {
-	return `${CACHE_KEYS.AVATAR}:${username.toLowerCase()}`;
+export function avatarKey(username: string, size?: number): string {
+	const baseKey = `${CACHE_KEYS.AVATAR}:${username.toLowerCase()}`;
+	return size ? `${baseKey}:${size}` : baseKey;
 }
 
 /**

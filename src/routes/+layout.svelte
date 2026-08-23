@@ -2,7 +2,6 @@
 	import './layout.css';
 	import favicon from '$lib/assets/favicon.svg';
 	import { Button } from '$lib/components/ui/button';
-	import { Toaster } from '$lib/components/ui/sonner';
 	import { Github } from '@lucide/svelte';
 	import { resolve } from '$app/paths';
 
@@ -13,8 +12,7 @@
 	<link rel="icon" href={favicon} />
 </svelte:head>
 
-<Toaster theme="dark" />
-<div class="flex min-h-screen flex-col">
+<div class="flex min-h-screen flex-col" data-sveltekit-preload-data="hover">
 	<!-- Minimal header -->
 	<header
 		class="sticky top-0 z-50 border-b border-border/50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
@@ -24,7 +22,7 @@
 				<Github class="h-5 w-5" />
 				<span>CommitRank</span>
 			</a>
-			<Button href={resolve('/join')} size="sm" class="h-7 px-3">Join</Button>
+			<Button href={resolve('/join')} size="xs">Join</Button>
 		</div>
 	</header>
 

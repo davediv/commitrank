@@ -1,13 +1,10 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
-	import { navigating, page } from '$app/stores';
+	import { navigating } from '$app/stores';
 	import { resolve } from '$app/paths';
 	import { onMount } from 'svelte';
 	import { Users, GitCommitHorizontal, Clock, CheckCircle, RefreshCw } from '@lucide/svelte';
-	import * as Avatar from '$lib/components/ui/avatar';
-	import * as Dialog from '$lib/components/ui/dialog';
+	import Avatar from '$lib/components/avatar.svelte';
 	import { Button } from '$lib/components/ui/button';
-	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { formatUTCClockTime } from '$lib/time';
 	import type { PageData } from './$types';
 
@@ -29,15 +26,15 @@
 	// Show loading state during navigation
 	let isLoading = $derived(!!$navigating);
 
-	// Number of skeleton rows to show
-	const SKELETON_ROWS = 10;
-
 	// Success message from registration
 	let successMessage: { username: string; rank: number; contributions: number } | null =
 		$state(null);
 	let showSuccessModal = $state(false);
+	let successDialog: HTMLDialogElement | null = $state(null);
 	let utcNow: Date | null = $state(null);
 	const utcNowLabel = $derived(utcNow ? formatUTCClockTime(utcNow) : '--:--:-- UTC');
+	const numberFormatter = new Intl.NumberFormat('en-US');
+	const todayUtc = new Date().toISOString().slice(0, 10);
 
 	onMount(() => {
 		// Check for join_success cookie
@@ -58,6 +55,12 @@
 		}
 	});
 
+	$effect(() => {
+		if (showSuccessModal && successDialog && !successDialog.open) {
+			successDialog.showModal();
+		}
+	});
+
 	onMount(() => {
 		utcNow = new Date();
 
@@ -71,28 +74,28 @@
 	});
 
 	function dismissSuccess() {
+		if (successDialog?.open) successDialog.close();
 		showSuccessModal = false;
 	}
 
-	function handlePeriodChange(period: string) {
-		const url = new URL($page.url);
-		url.searchParams.set('period', period);
-		url.searchParams.delete('page');
-		goto(url.toString(), { replaceState: true });
+	function getPeriodHref(period: string): string {
+		return `/?period=${encodeURIComponent(period)}`;
 	}
 
-	function handlePageChange(newPage: number) {
-		const url = new URL($page.url);
-		url.searchParams.set('page', newPage.toString());
-		goto(url.toString(), { replaceState: true });
+	function getPageHref(newPage: number): string {
+		return `/?period=${encodeURIComponent(data.period)}&page=${newPage}`;
 	}
 
 	function formatNumber(num: number): string {
-		return new Intl.NumberFormat().format(num);
+		return numberFormatter.format(num);
 	}
 
-	function getAvatarUrl(username: string): string {
-		return `/api/avatar/${username}`;
+	function getAvatarUrl(username: string, size: number): string {
+		return `/api/avatar/${username}?size=${size}`;
+	}
+
+	function getAvatarSrcset(username: string): string {
+		return [32, 64, 96].map((size) => `${getAvatarUrl(username, size)} ${size}w`).join(', ');
 	}
 
 	function formatRelativeTime(isoString: string | null): string {
@@ -180,23 +183,33 @@
 
 <!-- Success Modal -->
 {#if successMessage}
-	<Dialog.Root bind:open={showSuccessModal} onOpenChange={dismissSuccess}>
-		<Dialog.Content class="sm:max-w-sm">
-			<Dialog.Header>
-				<Dialog.Title class="flex items-center gap-2 text-base">
+	<dialog
+		bind:this={successDialog}
+		class="success-dialog w-[calc(100%-2rem)] max-w-sm rounded-lg border border-border bg-background p-6 text-foreground shadow-2xl"
+		aria-labelledby="welcome-title"
+		aria-describedby="welcome-description"
+		onclose={() => (showSuccessModal = false)}
+		onclick={(event) => {
+			if (event.target === event.currentTarget) dismissSuccess();
+		}}
+	>
+		<div class="flex flex-col gap-4">
+			<div class="flex flex-col gap-2">
+				<h2 id="welcome-title" class="flex items-center gap-2 text-base font-semibold">
 					<CheckCircle class="h-4 w-4 text-primary" />
 					Welcome to CommitRank
-				</Dialog.Title>
-				<Dialog.Description>
+				</h2>
+				<p id="welcome-description" class="text-sm text-muted-foreground">
 					<strong class="text-foreground">@{successMessage.username}</strong> joined with
-					<strong class="text-primary">{formatNumber(successMessage.contributions)}</strong> contributions.
-				</Dialog.Description>
-			</Dialog.Header>
-			<Dialog.Footer>
+					<strong class="text-primary">{formatNumber(successMessage.contributions)}</strong>
+					contributions.
+				</p>
+			</div>
+			<div class="flex justify-end">
 				<Button onclick={dismissSuccess} size="sm">View Leaderboard</Button>
-			</Dialog.Footer>
-		</Dialog.Content>
-	</Dialog.Root>
+			</div>
+		</div>
+	</dialog>
 {/if}
 
 <!-- Hero Section -->
@@ -219,10 +232,7 @@
 						<Users class="h-3 w-3" />
 						{formatNumber(data.stats.total_users)}
 					</span>
-					<span
-						class="flex items-center gap-1"
-						title="Contributions for {new Date().toISOString().split('T')[0]} (UTC date)"
-					>
+					<span class="flex items-center gap-1" title="Contributions for {todayUtc} (UTC date)">
 						<GitCommitHorizontal class="h-3 w-3" />
 						{formatNumber(data.stats.total_contributions_today)} today
 					</span>
@@ -255,23 +265,42 @@
 		</div>
 
 		<!-- Period Tabs -->
-		<div class="flex rounded-md border border-border bg-muted/30 p-0.5">
+		<div
+			class="flex rounded-md border border-border bg-muted/30 p-0.5"
+			role="tablist"
+			aria-label="Contribution period"
+		>
 			{#each periods as period (period.value)}
-				<button
-					onclick={() => handlePeriodChange(period.value)}
+				<a
+					href={getPeriodHref(period.value)}
+					role="tab"
+					aria-selected={data.period === period.value}
+					aria-label={period.label === '7d'
+						? '7 Days'
+						: period.label === '30d'
+							? '30 Days'
+							: period.label}
 					class="rounded px-3 py-1 text-sm font-medium transition-colors {data.period ===
 					period.value
 						? 'bg-card text-foreground shadow-sm'
 						: 'text-muted-foreground hover:text-foreground'}"
 				>
 					{period.label}
-				</button>
+				</a>
 			{/each}
 		</div>
 	</div>
 
 	<!-- Leaderboard Table -->
-	<div class="overflow-hidden rounded-md border border-border">
+	<div
+		class="relative overflow-hidden rounded-md border border-border transition-opacity duration-100 {isLoading
+			? 'opacity-70'
+			: ''}"
+		aria-busy={isLoading}
+	>
+		{#if isLoading}
+			<div class="absolute inset-x-0 top-0 z-10 h-0.5 animate-pulse bg-primary"></div>
+		{/if}
 		<table class="w-full">
 			<thead>
 				<tr class="border-b border-border bg-muted/30 text-sm text-muted-foreground">
@@ -282,31 +311,7 @@
 				</tr>
 			</thead>
 			<tbody class="divide-y divide-border">
-				{#if isLoading}
-					<!-- Loading skeleton -->
-					{#each Array.from({ length: SKELETON_ROWS }, (_, i) => i) as i (i)}
-						<tr>
-							<td class="py-3 text-center">
-								<Skeleton class="mx-auto h-4 w-4" />
-							</td>
-							<td class="py-3 pl-2">
-								<div class="flex items-center gap-2.5">
-									<Skeleton class="h-8 w-8 rounded-full" />
-									<div class="flex flex-col gap-1">
-										<Skeleton class="h-3.5 w-20" />
-										<Skeleton class="h-2.5 w-14" />
-									</div>
-								</div>
-							</td>
-							<td class="hidden py-3 text-right sm:table-cell">
-								<Skeleton class="ml-auto h-4 w-16" />
-							</td>
-							<td class="py-3 pr-4 text-right">
-								<Skeleton class="ml-auto h-4 w-10" />
-							</td>
-						</tr>
-					{/each}
-				{:else if data.leaderboard.leaderboard.length === 0}
+				{#if data.leaderboard.leaderboard.length === 0}
 					<tr>
 						<td colspan={4} class="py-12 text-center text-muted-foreground">
 							No developers yet.
@@ -329,19 +334,16 @@
 							</td>
 							<td class="py-2.5 pl-2">
 								<div class="flex items-center gap-2.5">
-									<Avatar.Root class="h-8 w-8">
-										<Avatar.Image
-											src={getAvatarUrl(entry.github_username)}
-											alt={entry.github_username}
-											loading="lazy"
-											decoding="async"
-											width={32}
-											height={32}
-										/>
-										<Avatar.Fallback class="text-[10px]">
-											{entry.github_username.slice(0, 2).toUpperCase()}
-										</Avatar.Fallback>
-									</Avatar.Root>
+									<Avatar
+										src={getAvatarUrl(entry.github_username, 64)}
+										srcset={getAvatarSrcset(entry.github_username)}
+										sizes="32px"
+										alt={entry.github_username}
+										initials={entry.github_username.slice(0, 2).toUpperCase()}
+										width={32}
+										height={32}
+										fallbackClass="text-[10px]"
+									/>
 									<div class="min-w-0 flex-1">
 										<a
 											href={resolve(`/${entry.github_username}`)}
@@ -390,24 +392,30 @@
 				Page {data.leaderboard.pagination.page} of {data.leaderboard.pagination.totalPages}
 			</span>
 			<div class="flex gap-1">
-				<Button
-					variant="ghost"
-					size="sm"
-					class="h-7 px-2 text-sm"
-					disabled={data.leaderboard.pagination.page <= 1}
-					onclick={() => handlePageChange(data.leaderboard.pagination.page - 1)}
-				>
-					Prev
-				</Button>
-				<Button
-					variant="ghost"
-					size="sm"
-					class="h-7 px-2 text-sm"
-					disabled={data.leaderboard.pagination.page >= data.leaderboard.pagination.totalPages}
-					onclick={() => handlePageChange(data.leaderboard.pagination.page + 1)}
-				>
-					Next
-				</Button>
+				{#if data.leaderboard.pagination.page > 1}
+					<a
+						href={getPageHref(data.leaderboard.pagination.page - 1)}
+						class="inline-flex h-7 items-center rounded-md px-2 text-sm hover:bg-accent hover:text-accent-foreground"
+					>
+						Prev
+					</a>
+				{:else}
+					<span class="inline-flex h-7 items-center px-2 text-sm opacity-50" aria-disabled="true"
+						>Prev</span
+					>
+				{/if}
+				{#if data.leaderboard.pagination.page < data.leaderboard.pagination.totalPages}
+					<a
+						href={getPageHref(data.leaderboard.pagination.page + 1)}
+						class="inline-flex h-7 items-center rounded-md px-2 text-sm hover:bg-accent hover:text-accent-foreground"
+					>
+						Next
+					</a>
+				{:else}
+					<span class="inline-flex h-7 items-center px-2 text-sm opacity-50" aria-disabled="true"
+						>Next</span
+					>
+				{/if}
 			</div>
 		</div>
 	{/if}

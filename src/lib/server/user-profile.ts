@@ -49,9 +49,93 @@ export async function computePeriodContributions(
 	db: DrizzleDb,
 	userId: string
 ): Promise<PeriodContribution[]> {
+	const ranges = Object.fromEntries(
+		PERIODS.map((period) => [period, getDateRange(period)])
+	) as Record<ContributionPeriod, { startDate: string; endDate: string }>;
+
+	interface RankedTotals {
+		today_total: number;
+		today_rank: number;
+		seven_days_total: number;
+		seven_days_rank: number;
+		thirty_days_total: number;
+		thirty_days_rank: number;
+		year_total: number;
+		year_rank: number;
+	}
+
+	try {
+		// Compute all four totals and ranks in one D1 statement. The previous
+		// implementation issued eight queries and transferred four full ranking
+		// tables to the Worker just to find one row.
+		const row = await db.get<RankedTotals>(sql`
+			WITH totals AS (
+				SELECT
+					u.id,
+					COALESCE(SUM(CASE WHEN c.date = ${ranges.today.startDate} THEN c.total_contributions ELSE 0 END), 0) AS today_total,
+					COALESCE(SUM(CASE WHEN c.date >= ${ranges['7days'].startDate} AND c.date <= ${ranges['7days'].endDate} THEN c.total_contributions ELSE 0 END), 0) AS seven_days_total,
+					COALESCE(SUM(CASE WHEN c.date >= ${ranges['30days'].startDate} AND c.date <= ${ranges['30days'].endDate} THEN c.total_contributions ELSE 0 END), 0) AS thirty_days_total,
+					COALESCE(SUM(CASE WHEN c.date >= ${ranges.year.startDate} AND c.date <= ${ranges.year.endDate} THEN c.total_contributions ELSE 0 END), 0) AS year_total
+				FROM users AS u
+				LEFT JOIN contributions AS c
+					ON c.user_id = u.id
+					AND c.date >= ${ranges.year.startDate}
+					AND c.date <= ${ranges.year.endDate}
+				GROUP BY u.id
+			), ranked AS (
+				SELECT
+					*,
+					ROW_NUMBER() OVER (ORDER BY today_total DESC, id ASC) AS today_rank,
+					ROW_NUMBER() OVER (ORDER BY seven_days_total DESC, id ASC) AS seven_days_rank,
+					ROW_NUMBER() OVER (ORDER BY thirty_days_total DESC, id ASC) AS thirty_days_rank,
+					ROW_NUMBER() OVER (ORDER BY year_total DESC, id ASC) AS year_rank
+				FROM totals
+			)
+			SELECT
+				today_total,
+				today_rank,
+				seven_days_total,
+				seven_days_rank,
+				thirty_days_total,
+				thirty_days_rank,
+				year_total,
+				year_rank
+			FROM ranked
+			WHERE id = ${userId}
+		`);
+
+		if (!row) {
+			return PERIODS.map((period) => ({ period, contributions: 0, rank: 0 }));
+		}
+
+		return [
+			{ period: 'today', contributions: Number(row.today_total), rank: Number(row.today_rank) },
+			{
+				period: '7days',
+				contributions: Number(row.seven_days_total),
+				rank: Number(row.seven_days_rank)
+			},
+			{
+				period: '30days',
+				contributions: Number(row.thirty_days_total),
+				rank: Number(row.thirty_days_rank)
+			},
+			{ period: 'year', contributions: Number(row.year_total), rank: Number(row.year_rank) }
+		];
+	} catch (error) {
+		// Keep compatibility with older/local SQLite builds while the optimized
+		// query is rolled out. This path preserves correctness at higher latency.
+		console.error(
+			JSON.stringify({
+				event: 'profile_rank_query_fallback',
+				error: error instanceof Error ? error.message : String(error)
+			})
+		);
+	}
+
 	return Promise.all(
 		PERIODS.map(async (period) => {
-			const { startDate, endDate } = getDateRange(period);
+			const { startDate, endDate } = ranges[period];
 
 			const [contribResult, rankResult] = await Promise.all([
 				// Get user's total contributions for this period

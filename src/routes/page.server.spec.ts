@@ -11,9 +11,11 @@ vi.mock('$lib/server/cache', () => ({
 	leaderboardKey: vi.fn((period: string, page: number, limit: number) => {
 		return `leaderboard:${period}:${page}:${limit}`;
 	}),
+	statsKey: vi.fn(() => 'stats'),
 	lastSyncKey: vi.fn(() => 'sync:last'),
 	CACHE_TTL: {
-		LEADERBOARD: 21600
+		LEADERBOARD: 21600,
+		STATS: 21600
 	}
 }));
 

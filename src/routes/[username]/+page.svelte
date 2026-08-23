@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { toast } from 'svelte-sonner';
+	import { onDestroy } from 'svelte';
 	import {
 		ArrowLeft,
 		ExternalLink,
@@ -12,7 +12,7 @@
 		Trophy,
 		GitCommitHorizontal
 	} from '@lucide/svelte';
-	import * as Avatar from '$lib/components/ui/avatar';
+	import Avatar from '$lib/components/avatar.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import ContributionHeatmap from '$lib/components/contribution-heatmap.svelte';
 	import ContributionChart from '$lib/components/contribution-chart.svelte';
@@ -30,6 +30,14 @@
 	const yearStats = $derived(data.profile.contributions.find((c) => c.period === 'year'));
 	const yearContributions = $derived(yearStats?.contributions ?? 0);
 	const yearRank = $derived(yearStats?.rank ?? 0);
+	const numberFormatter = new Intl.NumberFormat('en-US');
+	const joinDateFormatter = new Intl.DateTimeFormat('en-US', {
+		month: 'short',
+		day: 'numeric',
+		year: 'numeric'
+	});
+	let copyState: 'idle' | 'success' | 'error' = $state('idle');
+	let copyResetTimer: ReturnType<typeof setTimeout> | undefined;
 
 	const periodLabels: Record<string, string> = {
 		today: 'Today',
@@ -39,11 +47,15 @@
 	};
 
 	function formatNumber(num: number): string {
-		return new Intl.NumberFormat().format(num);
+		return numberFormatter.format(num);
 	}
 
-	function getAvatarUrl(username: string): string {
-		return `/api/avatar/${username}`;
+	function getAvatarUrl(username: string, size: number): string {
+		return `/api/avatar/${username}?size=${size}`;
+	}
+
+	function getAvatarSrcset(username: string): string {
+		return [80, 160].map((size) => `${getAvatarUrl(username, size)} ${size}w`).join(', ');
 	}
 
 	function shareOnX() {
@@ -55,16 +67,22 @@
 	async function copyLink() {
 		try {
 			await navigator.clipboard.writeText(profileUrl);
-			toast.success('Link copied to clipboard');
+			copyState = 'success';
 		} catch {
-			toast.error('Failed to copy link');
+			copyState = 'error';
 		}
+
+		if (copyResetTimer) clearTimeout(copyResetTimer);
+		copyResetTimer = setTimeout(() => (copyState = 'idle'), 2000);
 	}
 
 	function formatJoinDate(isoString: string): string {
-		const date = new Date(isoString);
-		return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+		return joinDateFormatter.format(new Date(isoString));
 	}
+
+	onDestroy(() => {
+		if (copyResetTimer) clearTimeout(copyResetTimer);
+	});
 </script>
 
 <svelte:head>
@@ -103,17 +121,19 @@
 
 	<!-- Profile Header -->
 	<div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start">
-		<Avatar.Root class="h-20 w-20 shrink-0">
-			<Avatar.Image
-				src={getAvatarUrl(data.profile.github_username)}
-				alt={data.profile.github_username}
-				width={80}
-				height={80}
-			/>
-			<Avatar.Fallback class="text-xl">
-				{data.profile.github_username.slice(0, 2).toUpperCase()}
-			</Avatar.Fallback>
-		</Avatar.Root>
+		<Avatar
+			src={getAvatarUrl(data.profile.github_username, 160)}
+			srcset={getAvatarSrcset(data.profile.github_username)}
+			sizes="80px"
+			alt={data.profile.github_username}
+			initials={data.profile.github_username.slice(0, 2).toUpperCase()}
+			width={80}
+			height={80}
+			class="shrink-0"
+			fallbackClass="text-xl"
+			loading="eager"
+			fetchpriority="high"
+		/>
 
 		<div class="min-w-0 flex-1">
 			<div class="flex flex-col gap-1">
@@ -199,7 +219,7 @@
 	</div>
 
 	<!-- Contribution Heatmap -->
-	<div class="mb-6">
+	<div class="deferred-section mb-6">
 		<h2 class="mb-3 flex items-center gap-2 text-sm font-medium">
 			<GitCommitHorizontal class="h-4 w-4" />
 			Contributions
@@ -210,7 +230,7 @@
 	</div>
 
 	<!-- Contribution Trend -->
-	<div class="mb-6">
+	<div class="deferred-section mb-6">
 		<h2 class="mb-3 text-sm font-medium">Weekly Trend</h2>
 		<div class="rounded-md border border-border bg-muted/20 p-3">
 			<ContributionChart contributions={data.dailyContributions} />
@@ -219,13 +239,20 @@
 
 	<!-- Share Section -->
 	<div class="flex items-center gap-2">
-		<Button variant="outline" size="sm" class="h-8" onclick={shareOnX}>
+		<Button variant="outline" size="sm" onclick={shareOnX}>
 			<Share2 class="mr-1.5 h-3.5 w-3.5" />
 			Share on X
 		</Button>
-		<Button variant="outline" size="sm" class="h-8" onclick={copyLink}>
+		<Button variant="outline" size="sm" onclick={copyLink}>
 			<Copy class="mr-1.5 h-3.5 w-3.5" />
-			Copy Link
+			{copyState === 'success' ? 'Copied' : copyState === 'error' ? 'Copy failed' : 'Copy Link'}
 		</Button>
+		<span class="sr-only" aria-live="polite">
+			{copyState === 'success'
+				? 'Link copied to clipboard'
+				: copyState === 'error'
+					? 'Failed to copy link'
+					: ''}
+		</span>
 	</div>
 </div>

@@ -1,5 +1,9 @@
 import type { Handle } from '@sveltejs/kit';
 
+const PAGE_CACHE_SECONDS = 60;
+const LEADERBOARD_PERIODS = new Set(['today', '7days', '30days', 'year']);
+const PROFILE_PATH = /^\/[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,37}[a-zA-Z0-9])?$/;
+
 /**
  * Allowed origins for CORS
  * In production, only allow commitrank.dev
@@ -31,6 +35,61 @@ function addSecurityHeaders(response: Response): Response {
 	headers.set('X-Content-Type-Options', 'nosniff');
 	headers.set('X-Frame-Options', 'DENY');
 	headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+
+	return new Response(response.body, {
+		status: response.status,
+		statusText: response.statusText,
+		headers
+	});
+}
+
+function isPublicPageRequest(request: Request, url: URL): boolean {
+	if (request.method !== 'GET' || !request.headers.get('Accept')?.includes('text/html')) {
+		return false;
+	}
+
+	return url.pathname === '/' || (url.pathname !== '/join' && PROFILE_PATH.test(url.pathname));
+}
+
+/**
+ * Collapse tracking and invalid query parameters into the same cache entry.
+ * The server only renders period/page on the leaderboard and no query state on
+ * profile pages, so this also prevents unbounded cache-key fragmentation.
+ */
+function createPageCacheKey(url: URL): Request {
+	const cacheUrl = new URL(url.origin);
+	cacheUrl.pathname = url.pathname;
+
+	if (url.pathname === '/') {
+		const period = url.searchParams.get('period');
+		if (period && LEADERBOARD_PERIODS.has(period) && period !== 'today') {
+			cacheUrl.searchParams.set('period', period);
+		}
+
+		const page = Number.parseInt(url.searchParams.get('page') || '', 10);
+		if (Number.isFinite(page) && page > 1) {
+			cacheUrl.searchParams.set('page', String(page));
+		}
+	}
+
+	return new Request(cacheUrl, { method: 'GET' });
+}
+
+function withPageCacheStatus(response: Response, status: 'HIT' | 'MISS'): Response {
+	const headers = new Headers(response.headers);
+	headers.set('X-Page-Cache', status);
+
+	return new Response(response.body, {
+		status: response.status,
+		statusText: response.statusText,
+		headers
+	});
+}
+
+function createCacheableResponse(response: Response): Response {
+	const headers = new Headers(response.headers);
+	headers.set('Cache-Control', `public, max-age=${PAGE_CACHE_SECONDS}`);
+	headers.delete('X-Page-Cache');
 
 	return new Response(response.body, {
 		status: response.status,
@@ -109,7 +168,60 @@ export const handle: Handle = async ({ event, resolve }) => {
 		return response;
 	}
 
-	// Handle non-API routes: add security headers
-	const response = await resolve(event);
-	return addSecurityHeaders(response);
+	// Public SSR pages are identical for every visitor. Keep the rendered HTML in
+	// each Cloudflare data center briefly so repeat visitors avoid Worker, KV, and
+	// D1 latency while preserving the leaderboard's near-real-time behavior.
+	const pageCache = platform?.caches
+		? await platform.caches.open('commitrank-public-pages')
+		: undefined;
+	const cacheableRequest = pageCache && isPublicPageRequest(request, url);
+	const pageCacheKey = cacheableRequest ? createPageCacheKey(url) : null;
+
+	if (pageCache && pageCacheKey) {
+		try {
+			const cachedResponse = await pageCache.match(pageCacheKey);
+			if (cachedResponse) {
+				return withPageCacheStatus(cachedResponse, 'HIT');
+			}
+		} catch (error) {
+			console.error(
+				JSON.stringify({
+					event: 'page_cache_read_failed',
+					path: url.pathname,
+					error: error instanceof Error ? error.message : String(error)
+				})
+			);
+		}
+	}
+
+	const response = addSecurityHeaders(await resolve(event));
+
+	if (
+		pageCache &&
+		pageCacheKey &&
+		response.status === 200 &&
+		response.headers.get('Content-Type')?.includes('text/html') &&
+		!response.headers.has('Set-Cookie')
+	) {
+		const responseForCache = createCacheableResponse(response.clone());
+		const cacheWrite = pageCache.put(pageCacheKey, responseForCache).catch((error) => {
+			console.error(
+				JSON.stringify({
+					event: 'page_cache_write_failed',
+					path: url.pathname,
+					error: error instanceof Error ? error.message : String(error)
+				})
+			);
+		});
+
+		if (platform?.ctx) {
+			platform.ctx.waitUntil(cacheWrite);
+		} else {
+			await cacheWrite;
+		}
+
+		return withPageCacheStatus(createCacheableResponse(response), 'MISS');
+	}
+
+	return response;
 };
