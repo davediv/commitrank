@@ -44,8 +44,17 @@
 		count: number;
 		col: number;
 		row: number;
-		color: string;
+		level: number;
 	}
+
+	let hoveredCell: CellData | null = $state(null);
+	let tooltipX = $state(0);
+	let tooltipY = $state(0);
+	const dateFormatter = new Intl.DateTimeFormat('en-US', {
+		month: 'short',
+		day: 'numeric',
+		year: 'numeric'
+	});
 
 	/**
 	 * Build the heatmap grid data from contribution data.
@@ -82,12 +91,12 @@
 			thresholds = [1, q1 + 1, q2 + 1, q3 + 1];
 		}
 
-		function getColor(count: number): string {
-			if (count === 0) return COLORS[0];
-			if (count < thresholds[1]) return COLORS[1];
-			if (count < thresholds[2]) return COLORS[2];
-			if (count < thresholds[3]) return COLORS[3];
-			return COLORS[4];
+		function getLevel(count: number): number {
+			if (count === 0) return 0;
+			if (count < thresholds[1]) return 1;
+			if (count < thresholds[2]) return 2;
+			if (count < thresholds[3]) return 3;
+			return 4;
 		}
 
 		// Generate cells
@@ -122,7 +131,7 @@
 				count,
 				col,
 				row,
-				color: getColor(count)
+				level: getLevel(count)
 			});
 
 			currentMs += 86400000;
@@ -130,26 +139,65 @@
 
 		const svgWidth = LABEL_WIDTH + numWeeks * CELL_STEP;
 		const svgHeight = HEADER_HEIGHT + DAYS_IN_WEEK * CELL_STEP;
+		const paths = COLORS.map((color) => ({ color, d: '' }));
 
-		return { cells, monthLabels, svgWidth, svgHeight };
+		// Hundreds of individual <rect><title> pairs made profile hydration and
+		// layout disproportionately expensive. Grouping equal-color squares into
+		// five SVG paths preserves the visual while cutting ~740 DOM nodes.
+		for (const cell of cells) {
+			const x = LABEL_WIDTH + cell.col * CELL_STEP;
+			const y = HEADER_HEIGHT + cell.row * CELL_STEP;
+			paths[cell.level].d += `M${x} ${y}h${CELL_SIZE}v${CELL_SIZE}h-${CELL_SIZE}Z`;
+		}
+
+		return { cells, monthLabels, paths, svgWidth, svgHeight };
 	}
 
 	const heatmapData = $derived.by(() => buildHeatmapData(contributions));
 
 	function formatDate(dateStr: string): string {
-		const d = new Date(dateStr + 'T00:00:00');
-		return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+		return dateFormatter.format(new Date(dateStr + 'T00:00:00'));
+	}
+
+	function handlePointerMove(event: PointerEvent) {
+		const svg = event.currentTarget as SVGSVGElement;
+		const bounds = svg.getBoundingClientRect();
+		const x = ((event.clientX - bounds.left) / bounds.width) * heatmapData.svgWidth;
+		const y = ((event.clientY - bounds.top) / bounds.height) * heatmapData.svgHeight;
+		const relativeX = x - LABEL_WIDTH;
+		const relativeY = y - HEADER_HEIGHT;
+
+		if (relativeX < 0 || relativeY < 0) {
+			hoveredCell = null;
+			return;
+		}
+
+		const col = Math.floor(relativeX / CELL_STEP);
+		const row = Math.floor(relativeY / CELL_STEP);
+		const insideCell = relativeX % CELL_STEP <= CELL_SIZE && relativeY % CELL_STEP <= CELL_SIZE;
+		const cell = heatmapData.cells[col * DAYS_IN_WEEK + row];
+
+		if (!insideCell || !cell || cell.col !== col || cell.row !== row) {
+			hoveredCell = null;
+			return;
+		}
+
+		hoveredCell = cell;
+		tooltipX = event.clientX - bounds.left;
+		tooltipY = event.clientY - bounds.top;
 	}
 </script>
 
-<div class="overflow-x-auto">
+<div class="relative overflow-x-auto" onpointerleave={() => (hoveredCell = null)}>
 	<svg
 		width={heatmapData.svgWidth}
 		height={heatmapData.svgHeight}
 		class="block"
 		role="img"
 		aria-label="Contribution heatmap for the past year"
+		onpointermove={handlePointerMove}
 	>
+		<title>Contribution heatmap for the past year</title>
 		<!-- Month labels -->
 		{#each heatmapData.monthLabels as { label, x } (x)}
 			<text {x} y={10} class="fill-muted-foreground text-[10px]">{label}</text>
@@ -168,23 +216,32 @@
 			{/if}
 		{/each}
 
-		<!-- Contribution cells -->
-		{#each heatmapData.cells as cell (cell.date)}
-			<rect
-				x={LABEL_WIDTH + cell.col * CELL_STEP}
-				y={HEADER_HEIGHT + cell.row * CELL_STEP}
-				width={CELL_SIZE}
-				height={CELL_SIZE}
-				rx={2}
-				fill={cell.color}
-				class="outline-none"
-			>
-				<title
-					>{cell.count} contribution{cell.count !== 1 ? 's' : ''} on {formatDate(cell.date)}</title
-				>
-			</rect>
+		<!-- Contribution cells, grouped by intensity into five paths -->
+		{#each heatmapData.paths as path (path.color)}
+			{#if path.d}
+				<path d={path.d} fill={path.color} pointer-events="none" />
+			{/if}
 		{/each}
+
+		<rect
+			x={LABEL_WIDTH}
+			y={HEADER_HEIGHT}
+			width={heatmapData.svgWidth - LABEL_WIDTH}
+			height={heatmapData.svgHeight - HEADER_HEIGHT}
+			fill="transparent"
+		/>
 	</svg>
+
+	{#if hoveredCell}
+		<div
+			class="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-[calc(100%+6px)] rounded border border-border bg-card px-2 py-1 text-[10px] whitespace-nowrap text-foreground shadow-lg"
+			style="left: {tooltipX}px; top: {tooltipY}px"
+		>
+			{hoveredCell.count} contribution{hoveredCell.count !== 1 ? 's' : ''} on {formatDate(
+				hoveredCell.date
+			)}
+		</div>
+	{/if}
 </div>
 
 <!-- Legend -->

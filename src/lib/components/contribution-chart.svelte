@@ -35,7 +35,16 @@
 		month: number;
 	}
 
+	interface ChartPoint extends WeekBucket {
+		x: number;
+		y: number;
+	}
+
+	let containerElement: HTMLDivElement | undefined = $state();
 	let containerWidth = $state(0);
+	let hoveredPoint: ChartPoint | null = $state(null);
+	let tooltipX = $state(0);
+	let tooltipY = $state(0);
 
 	function parseDateUTC(date: string): number {
 		return Date.parse(`${date}T00:00:00Z`);
@@ -99,7 +108,7 @@
 		if (drawWidth <= 0) return null;
 
 		// Generate points
-		const points = weeks.map((w, i) => {
+		const points: ChartPoint[] = weeks.map((w, i) => {
 			const x = PADDING_LEFT + (i / Math.max(weeks.length - 1, 1)) * drawWidth;
 			const y = PADDING_TOP + drawHeight - (w.total / maxVal) * drawHeight;
 			return { x, y, ...w };
@@ -138,9 +147,38 @@
 	}
 
 	const chartData = $derived.by(() => buildChartData(contributions, containerWidth));
+
+	// ResizeObserver reports the measured size after layout. This avoids the
+	// synchronous width read performed by a clientWidth binding during hydration.
+	$effect(() => {
+		if (!containerElement) return;
+
+		const observer = new ResizeObserver(([entry]) => {
+			containerWidth = entry.contentRect.width;
+		});
+		observer.observe(containerElement);
+
+		return () => observer.disconnect();
+	});
+
+	function handlePointerMove(event: PointerEvent) {
+		if (!chartData || chartData.points.length === 0) return;
+
+		const svg = event.currentTarget as SVGSVGElement;
+		const bounds = svg.getBoundingClientRect();
+		const ratio = Math.min(Math.max((event.clientX - bounds.left) / bounds.width, 0), 1);
+		const index = Math.round(ratio * (chartData.points.length - 1));
+		hoveredPoint = chartData.points[index];
+		tooltipX = (hoveredPoint.x / containerWidth) * bounds.width;
+		tooltipY = hoveredPoint.y;
+	}
 </script>
 
-<div class="w-full" bind:clientWidth={containerWidth}>
+<div
+	class="relative w-full"
+	bind:this={containerElement}
+	onpointerleave={() => (hoveredPoint = null)}
+>
 	{#if chartData && containerWidth > 0}
 		<svg
 			width={containerWidth}
@@ -148,7 +186,9 @@
 			class="block"
 			role="img"
 			aria-label="Weekly contribution trend chart"
+			onpointermove={handlePointerMove}
 		>
+			<title>Weekly contribution trend chart</title>
 			<!-- Grid lines -->
 			{#each chartData.gridLines as y (y)}
 				<line
@@ -173,18 +213,10 @@
 				stroke-linejoin="round"
 			/>
 
-			<!-- Data points (only show on hover via CSS) -->
-			{#each chartData.points as point (point.weekStart)}
-				<circle
-					cx={point.x}
-					cy={point.y}
-					r="3"
-					fill="oklch(0.55 0.18 145)"
-					class="opacity-0 hover:opacity-100"
-				>
-					<title>Week of {point.weekStart}: {point.total} contributions</title>
-				</circle>
-			{/each}
+			<!-- A single active point replaces dozens of always-hydrated circles. -->
+			{#if hoveredPoint}
+				<circle cx={hoveredPoint.x} cy={hoveredPoint.y} r="3" fill="oklch(0.55 0.18 145)" />
+			{/if}
 
 			<!-- Y-axis labels -->
 			{#each chartData.yLabels as label, i (i)}
@@ -204,7 +236,24 @@
 					{label}
 				</text>
 			{/each}
+
+			<rect
+				x={PADDING_LEFT}
+				y={PADDING_TOP}
+				width={containerWidth - PADDING_LEFT - PADDING_RIGHT}
+				height={chartData.drawHeight}
+				fill="transparent"
+			/>
 		</svg>
+
+		{#if hoveredPoint}
+			<div
+				class="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-[calc(100%+6px)] rounded border border-border bg-card px-2 py-1 text-[10px] whitespace-nowrap text-foreground shadow-lg"
+				style="left: {tooltipX}px; top: {tooltipY}px"
+			>
+				Week of {hoveredPoint.weekStart}: {hoveredPoint.total} contributions
+			</div>
+		{/if}
 	{:else}
 		<div class="flex h-[120px] items-center justify-center text-sm text-muted-foreground">
 			No contribution data available

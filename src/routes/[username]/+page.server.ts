@@ -64,8 +64,14 @@ export const load: PageServerLoad = async ({ params, platform, setHeaders }) => 
 		const profile = buildUserProfile(user, periodContributions);
 		const pageData: ProfilePageData = { profile, dailyContributions };
 
-		// Cache the full payload
-		await setCached(kv, cacheKey, pageData, CACHE_TTL.USER);
+		// Persist the public payload after the response is ready. A KV write should
+		// never extend profile TTFB on Cloudflare Workers.
+		const cacheWrite = setCached(kv, cacheKey, pageData, CACHE_TTL.USER);
+		if (platform?.ctx) {
+			platform.ctx.waitUntil(cacheWrite);
+		} else {
+			await cacheWrite;
+		}
 
 		setHeaders({ 'Cache-Control': 'public, max-age=30' });
 

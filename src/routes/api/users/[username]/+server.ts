@@ -63,7 +63,12 @@ export const GET: RequestHandler = async ({ params, platform }) => {
 		const userProfile: UserProfile = buildUserProfile(user, periodContributions);
 
 		// Cache the response
-		await setCached(kv, cacheKey, userProfile, CACHE_TTL.USER);
+		const cacheWrite = setCached(kv, cacheKey, userProfile, CACHE_TTL.USER);
+		if (platform?.ctx) {
+			platform.ctx.waitUntil(cacheWrite);
+		} else {
+			await cacheWrite;
+		}
 
 		return json(createSuccessResponse(userProfile, { cached: false }));
 	} catch (error) {

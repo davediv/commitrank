@@ -195,7 +195,12 @@ export const GET: RequestHandler = async ({ url, platform, getClientAddress }) =
 		};
 
 		// Cache the response
-		await setCached(kv, cacheKey, response, CACHE_TTL.LEADERBOARD);
+		const cacheWrite = setCached(kv, cacheKey, response, CACHE_TTL.LEADERBOARD);
+		if (platform?.ctx) {
+			platform.ctx.waitUntil(cacheWrite);
+		} else {
+			await cacheWrite;
+		}
 
 		return json(createSuccessResponse(response, { cached: false }));
 	} catch (error) {

@@ -135,9 +135,6 @@
 				bind:value={github_username}
 				onblur={handleGitHubBlur}
 				aria-invalid={!!githubError || !!form?.error}
-				class="h-9 {githubError || (form?.error && form?.error !== 'INVALID_TWITTER')
-					? 'border-destructive focus-visible:ring-destructive'
-					: ''}"
 				disabled={isSubmitting}
 				required
 			/>
@@ -160,9 +157,7 @@
 				placeholder="username"
 				bind:value={twitter_handle}
 				onblur={handleTwitterBlur}
-				class="h-9 {twitterError || form?.error === 'INVALID_TWITTER'
-					? 'border-destructive focus-visible:ring-destructive'
-					: ''}"
+				aria-invalid={!!twitterError || form?.error === 'INVALID_TWITTER'}
 				disabled={isSubmitting}
 			/>
 			{#if twitterError}

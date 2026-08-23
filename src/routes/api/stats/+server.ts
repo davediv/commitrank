@@ -20,7 +20,12 @@ export const GET: RequestHandler = async ({ platform }) => {
 		// Check cache first
 		const cachedStats = await getCached<StatsResponse>(kv, cacheKey);
 		if (cachedStats) {
-			return json(createSuccessResponse(cachedStats, { cached: true }));
+			return json(
+				createSuccessResponse(
+					{ ...cachedStats, next_sync: calculateNextHourlySync() },
+					{ cached: true }
+				)
+			);
 		}
 
 		// Cache miss - query database
@@ -67,8 +72,12 @@ export const GET: RequestHandler = async ({ platform }) => {
 			next_sync: calculateNextHourlySync()
 		};
 
-		// Cache the response
-		await setCached(kv, cacheKey, stats, CACHE_TTL.STATS);
+		const cacheWrite = setCached(kv, cacheKey, stats, CACHE_TTL.STATS);
+		if (platform?.ctx) {
+			platform.ctx.waitUntil(cacheWrite);
+		} else {
+			await cacheWrite;
+		}
 
 		return json(createSuccessResponse(stats, { cached: false }));
 	} catch (error) {
