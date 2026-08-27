@@ -7,6 +7,20 @@ import { sveltekit } from '@sveltejs/kit/vite';
 export default defineConfig({
 	plugins: [tailwindcss(), sveltekit(), devtoolsJson()],
 
+	/*
+	 * Wrangler, not Vite, resolves the resvg Wasm module: workerd refuses to
+	 * compile Wasm from bytes at runtime ("Wasm code generation disallowed by
+	 * embedder"), so it has to enter the bundle as a module and be compiled at
+	 * deploy time. Vite has no loader for that and fails the build outright, so
+	 * the import is kept external and handed to the CompiledWasm rule in
+	 * wrangler.jsonc.
+	 */
+	build: {
+		rollupOptions: {
+			external: [/\.wasm$/]
+		}
+	},
+
 	test: {
 		expect: { requireAssertions: true },
 

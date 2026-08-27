@@ -15,6 +15,7 @@
 	let { data }: Props = $props();
 
 	const profileUrl = $derived(`https://commitrank.dev/${data.profile.github_username}`);
+	const cardUrl = $derived(`https://commitrank.dev/api/card/${data.profile.github_username}.png`);
 
 	// Find year contribution stats for share text
 	const yearStats = $derived(data.profile.contributions.find((c) => c.period === 'year'));
@@ -29,6 +30,9 @@
 	let copyState: 'idle' | 'success' | 'error' = $state('idle');
 	let copyResetTimer: ReturnType<typeof setTimeout> | undefined;
 	let shareCard: ReturnType<typeof ShareCardDialog> | null = $state(null);
+	const cardAlt = $derived(
+		`${data.profile.github_username} on CommitRank: rank #${yearRank}, ${formatNumber(yearContributions)} contributions this year.`
+	);
 
 	const periodLabels: Record<string, string> = {
 		today: 'Today',
@@ -111,13 +115,26 @@
 		content="{formatNumber(yearContributions)} contributions this year. Rank #{yearRank}."
 	/>
 	<meta property="og:type" content="profile" />
-	<meta property="og:image" content="/api/avatar/{data.profile.github_username}" />
+	<!--
+		The share card, rendered server-side: a crawler runs no JavaScript, so the
+		canvas the page draws is invisible to it. Absolute because several unfurlers
+		refuse to resolve a relative og:image.
+	-->
+	<meta property="og:image" content={cardUrl} />
+	<meta property="og:image:type" content="image/png" />
+	<meta property="og:image:width" content="1080" />
+	<meta property="og:image:height" content="1080" />
+	<meta property="og:image:alt" content={cardAlt} />
+	<!-- summary, not summary_large_image: X crops the latter to 1.91:1 and would
+	     cut the top and bottom off a square card. -->
 	<meta name="twitter:card" content="summary" />
 	<meta name="twitter:title" content="{data.profile.github_username} on CommitRank" />
 	<meta
 		name="twitter:description"
 		content="{formatNumber(yearContributions)} contributions this year. Rank #{yearRank}."
 	/>
+	<meta name="twitter:image" content={cardUrl} />
+	<meta name="twitter:image:alt" content={cardAlt} />
 </svelte:head>
 
 <div class="mx-auto max-w-[var(--viz-max)] px-3 py-4">

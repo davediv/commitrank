@@ -17,6 +17,18 @@
 	},
 
 	/**
+	 * Compile imported .wasm as a Worker module at deploy time.
+	 * Required by the resvg rasterizer behind /api/card/[username].png.
+	 */
+	"rules": [
+		{
+			"type": "CompiledWasm",
+			"globs": ["**/*.wasm"],
+			"fallthrough": true
+		}
+	],
+
+	/**
 	 * D1 Database Bindings
 	 * https://developers.cloudflare.com/d1/
 	 */

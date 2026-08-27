@@ -30,7 +30,8 @@ export const CACHE_KEYS = {
 	GITHUB: 'github',
 	STATS: 'stats',
 	LAST_SYNC: 'last_sync',
-	AVATAR: 'avatar'
+	AVATAR: 'avatar',
+	CARD: 'card'
 } as const;
 
 /**
@@ -52,6 +53,13 @@ export function userKey(username: string): string {
  */
 export function profilePageKey(username: string): string {
 	return `${CACHE_KEYS.PROFILE}:${username.toLowerCase()}`;
+}
+
+/**
+ * Generate a cache key for a rendered share card PNG
+ */
+export function cardKey(username: string): string {
+	return `${CACHE_KEYS.CARD}:${username.toLowerCase()}`;
 }
 
 /**
@@ -159,7 +167,8 @@ export async function invalidateLeaderboardCache(kv: KVNamespace): Promise<void>
 export async function invalidateUserCache(kv: KVNamespace, username: string): Promise<void> {
 	await Promise.all([
 		deleteCached(kv, userKey(username)),
-		deleteCached(kv, profilePageKey(username))
+		deleteCached(kv, profilePageKey(username)),
+		deleteCached(kv, cardKey(username))
 	]);
 }
 
