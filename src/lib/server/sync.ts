@@ -252,6 +252,9 @@ export async function runScheduledSync(
 		invalidateLeaderboardCache(kv),
 		invalidateByPrefix(kv, CACHE_KEYS.USER),
 		invalidateByPrefix(kv, CACHE_KEYS.PROFILE),
+		// Rendered share cards embed contribution counts and ranks, so they go
+		// stale on exactly the same beat as the profile payload.
+		invalidateByPrefix(kv, CACHE_KEYS.CARD),
 		deleteCached(kv, statsKey()),
 		// Store last sync timestamp (TTL: 24 hours - long enough to survive between syncs)
 		setCached(kv, lastSyncKey(), syncCompletedAt, 86400)
