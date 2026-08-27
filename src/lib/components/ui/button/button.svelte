@@ -1,7 +1,7 @@
 <script lang="ts" module>
-	import type { WithElementRef } from '$lib/utils.js';
+	import { cn, type WithElementRef } from '$lib/utils.js';
 	import type { HTMLAnchorAttributes, HTMLButtonAttributes } from 'svelte/elements';
-	import { clsx, type ClassValue } from 'clsx';
+	import type { ClassValue } from 'clsx';
 
 	export type ButtonVariant =
 		| 'default'
@@ -12,26 +12,38 @@
 		| 'link';
 	export type ButtonSize = 'default' | 'xs' | 'sm' | 'lg' | 'icon' | 'icon-sm' | 'icon-lg';
 
+	/*
+	 * A bordered rectangle with a mono label — never a pill, never a shadow.
+	 * Press inverts instantly (transition-duration 0 on :active, which fires on
+	 * pointer-down); release fades back over 80ms. That inversion is this
+	 * style's equivalent of a scale-down press: a flat 1px box shimmers when
+	 * scaled, and a terminal key inverts.
+	 */
 	const BASE =
-		"focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive inline-flex shrink-0 items-center justify-center gap-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors outline-none focus-visible:ring-[3px] disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4";
+		'group/btn inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-md border text-sm font-medium term-transition disabled:pointer-events-none disabled:border-border disabled:text-disabled aria-disabled:pointer-events-none aria-disabled:border-border aria-disabled:text-disabled aria-invalid:border-destructive aria-invalid:text-destructive [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*=size-])]:size-3.5';
+
 	const VARIANTS: Record<ButtonVariant, string> = {
-		default: 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-xs',
+		default:
+			'border-primary bg-primary/10 text-primary hover:bg-primary/20 active:bg-primary active:text-primary-foreground',
 		destructive:
-			'bg-destructive hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60 text-white shadow-xs',
+			'border-destructive bg-destructive/10 text-destructive hover:bg-destructive/20 active:bg-destructive active:text-background',
 		outline:
-			'bg-background hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 border shadow-xs',
-		secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80 shadow-xs',
-		ghost: 'hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50',
-		link: 'text-primary underline-offset-4 hover:underline'
+			'border-border-control bg-transparent text-foreground hover:border-primary hover:text-primary active:bg-primary active:text-primary-foreground',
+		secondary: 'border-border bg-card text-foreground hover:border-border-control active:bg-accent',
+		ghost:
+			'border-transparent bg-transparent text-muted-foreground hover:text-foreground active:bg-accent',
+		link: 'border-transparent bg-transparent text-primary underline-offset-4 hover:underline active:opacity-70'
 	};
+
+	/* Tight — 24/28/32/36px. Terminal UIs run small. */
 	const SIZES: Record<ButtonSize, string> = {
-		default: 'h-9 px-4 py-2 has-[>svg]:px-3',
-		xs: 'h-7 gap-1 rounded-md px-2.5',
-		sm: 'h-8 gap-1.5 rounded-md px-3 has-[>svg]:px-2.5',
-		lg: 'h-10 rounded-md px-6 has-[>svg]:px-4',
-		icon: 'size-9',
-		'icon-sm': 'size-8',
-		'icon-lg': 'size-10'
+		xs: 'h-6 gap-1 px-2 text-2xs',
+		sm: 'h-7 px-2.5 text-xs',
+		default: 'h-8 px-3',
+		lg: 'h-9 px-4',
+		icon: 'size-8',
+		'icon-sm': 'size-7',
+		'icon-lg': 'size-9'
 	};
 
 	export function buttonVariants(
@@ -41,7 +53,7 @@
 			class?: ClassValue;
 		} = {}
 	): string {
-		return clsx(
+		return cn(
 			BASE,
 			VARIANTS[options.variant ?? 'default'],
 			SIZES[options.size ?? 'default'],
@@ -53,6 +65,8 @@
 		WithElementRef<HTMLAnchorAttributes> & {
 			variant?: ButtonVariant;
 			size?: ButtonSize;
+			/** Keyboard hint rendered on the right, e.g. `↵` or `⌘K`. */
+			kbd?: string;
 		};
 </script>
 
@@ -65,10 +79,23 @@
 		href = undefined,
 		type = 'button',
 		disabled,
+		kbd,
 		children,
 		...restProps
 	}: ButtonProps = $props();
 </script>
+
+{#snippet label()}
+	{@render children?.()}
+	{#if kbd}
+		<span
+			aria-hidden="true"
+			class="ml-1 border border-current px-1 text-2xs leading-none opacity-60"
+		>
+			{kbd}
+		</span>
+	{/if}
+{/snippet}
 
 {#if href}
 	<a
@@ -81,7 +108,7 @@
 		tabindex={disabled ? -1 : undefined}
 		{...restProps}
 	>
-		{@render children?.()}
+		{@render label()}
 	</a>
 {:else}
 	<button
@@ -92,6 +119,6 @@
 		{disabled}
 		{...restProps}
 	>
-		{@render children?.()}
+		{@render label()}
 	</button>
 {/if}

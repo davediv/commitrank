@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
-	import { Github, AtSign, Loader2, ArrowLeft } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import type { ActionData } from './$types';
@@ -78,32 +77,38 @@
 	<meta name="description" content="Join the CommitRank leaderboard and see where you rank." />
 </svelte:head>
 
-<div class="mx-auto max-w-sm px-4 py-12">
-	<!-- Back link -->
+<!-- Prose measure, not full bleed: a form is the one thing on this site that
+     should not stretch to the viewport. -->
+<div class="mx-auto w-full max-w-md px-3 py-6">
 	<a
 		href={resolve('/')}
-		class="mb-8 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+		class="term-transition inline-flex h-6 items-center gap-1 text-sm text-subtle-foreground hover:text-primary"
 	>
-		<ArrowLeft class="h-3 w-3" />
-		Back to leaderboard
+		<span aria-hidden="true">←</span>
+		Back to Leaderboard
 	</a>
 
-	<!-- Header -->
-	<div class="mb-6">
-		<h1 class="text-lg font-semibold">Join CommitRank</h1>
-		<p class="mt-1 text-muted-foreground">Enter your GitHub username to see where you rank.</p>
+	<div class="mt-6 mb-5 flex flex-col gap-1.5">
+		<p class="text-sm text-subtle-foreground">
+			<span aria-hidden="true" class="text-primary">$</span> commitrank join
+		</p>
+		<h1 class="text-lg font-medium text-foreground">Join the CommitRank Leaderboard</h1>
+		<p class="text-sm text-muted-foreground">Enter your GitHub username to see where you rank.</p>
 	</div>
 
-	<!-- Error message -->
 	{#if form?.error}
 		<div
-			class="mb-4 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-destructive"
+			class="mb-4 border border-destructive bg-destructive/10 px-3 py-2"
+			role="alert"
+			id="form-error"
 		>
-			{form.message}
+			<p class="text-sm font-medium text-destructive">
+				<span aria-hidden="true">✗</span> Registration Failed
+			</p>
+			<p class="mt-0.5 text-sm text-muted-foreground">{form.message}</p>
 		</div>
 	{/if}
 
-	<!-- Form -->
 	<form
 		method="POST"
 		use:enhance={() => {
@@ -119,65 +124,70 @@
 				}
 			};
 		}}
-		class="space-y-4"
+		class="flex flex-col gap-4"
 	>
-		<!-- GitHub Username -->
-		<div class="space-y-1.5">
-			<label for="github_username" class="flex items-center gap-1.5 font-medium">
-				<Github class="h-3.5 w-3.5" />
+		<div class="flex flex-col gap-1.5">
+			<label for="github_username" class="term-label flex items-center gap-1">
 				GitHub Username
+				<span aria-hidden="true" class="text-destructive">*</span>
 			</label>
 			<Input
 				type="text"
 				id="github_username"
 				name="github_username"
+				prompt=">"
 				placeholder="octocat"
 				bind:value={github_username}
 				onblur={handleGitHubBlur}
 				aria-invalid={!!githubError || !!form?.error}
+				aria-describedby={githubError
+					? 'github_username-error'
+					: form?.error
+						? 'form-error'
+						: undefined}
 				disabled={isSubmitting}
 				required
 			/>
 			{#if githubError}
-				<p class="text-sm text-destructive">{githubError}</p>
+				<p id="github_username-error" class="text-xs text-destructive">{githubError}</p>
 			{/if}
 		</div>
 
-		<!-- Twitter Handle -->
-		<div class="space-y-1.5">
-			<label for="twitter_handle" class="flex items-center gap-1.5 font-medium">
-				<AtSign class="h-3.5 w-3.5" />
-				<span>X Handle</span>
-				<span class="font-normal text-muted-foreground">(optional)</span>
+		<div class="flex flex-col gap-1.5">
+			<label for="twitter_handle" class="term-label flex items-center gap-1">
+				Twitter / X Handle
+				<span class="text-subtle-foreground normal-case">(optional)</span>
 			</label>
 			<Input
 				type="text"
 				id="twitter_handle"
 				name="twitter_handle"
+				prompt="@"
 				placeholder="username"
 				bind:value={twitter_handle}
 				onblur={handleTwitterBlur}
 				aria-invalid={!!twitterError || form?.error === 'INVALID_TWITTER'}
+				aria-describedby={twitterError ? 'twitter_handle-error' : undefined}
 				disabled={isSubmitting}
 			/>
 			{#if twitterError}
-				<p class="text-sm text-destructive">{twitterError}</p>
+				<p id="twitter_handle-error" class="text-xs text-destructive">{twitterError}</p>
 			{/if}
 		</div>
 
-		<!-- Submit Button -->
-		<Button type="submit" class="h-9 w-full" disabled={isSubmitting}>
+		<Button type="submit" size="lg" class="mt-1 w-full" disabled={isSubmitting} kbd="↵">
 			{#if isSubmitting}
-				<Loader2 class="mr-1.5 h-3.5 w-3.5 animate-spin" />
-				Joining...
+				<span aria-hidden="true" class="term-cursor"></span>
+				Joining…
 			{:else}
 				Join Leaderboard
 			{/if}
 		</Button>
+		<span class="sr-only" aria-live="polite">{isSubmitting ? 'Joining…' : ''}</span>
 	</form>
 
-	<!-- Privacy Notice -->
-	<p class="mt-6 text-center text-[11px] leading-relaxed text-muted-foreground">
+	<p class="mt-6 text-xs leading-relaxed text-subtle-foreground">
 		By joining, you agree to have your public GitHub contribution data displayed on the leaderboard.
+		All data shown is publicly available information from GitHub.
 	</p>
 </div>

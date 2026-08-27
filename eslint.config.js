@@ -52,5 +52,12 @@ export default defineConfig(
 		rules: {
 			'svelte/no-navigation-without-resolve': 'off'
 		}
+	},
+	{
+		// The command palette navigates to dynamic usernames and period query params
+		files: ['src/lib/components/command-palette.svelte'],
+		rules: {
+			'svelte/no-navigation-without-resolve': 'off'
+		}
 	}
 );

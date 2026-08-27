@@ -10,7 +10,7 @@
 	const CHART_HEIGHT = 120;
 	const PADDING_TOP = 8;
 	const PADDING_BOTTOM = 20;
-	const PADDING_LEFT = 32;
+	const PADDING_LEFT = 52;
 	const PADDING_RIGHT = 8;
 	const DAY_MS = 86400000;
 
@@ -40,6 +40,8 @@
 		y: number;
 	}
 
+	const numberFormatter = new Intl.NumberFormat('en-US');
+
 	let containerElement: HTMLDivElement | undefined = $state();
 	let containerWidth = $state(0);
 	let hoveredPoint: ChartPoint | null = $state(null);
@@ -61,6 +63,17 @@
 
 	function addDaysUTC(timestamp: number, days: number): number {
 		return timestamp + days * DAY_MS;
+	}
+
+	/** Rounds up to the next readable axis value: 3153 -> 4000, 78 -> 80. */
+	function niceCeiling(value: number): number {
+		if (value <= 1) return 1;
+		const magnitude = Math.pow(10, Math.floor(Math.log10(value)));
+		for (const step of [1, 1.5, 2, 3, 4, 5, 6, 8, 10]) {
+			const candidate = step * magnitude;
+			if (value <= candidate) return candidate;
+		}
+		return 10 * magnitude;
 	}
 
 	function buildChartData(contribs: ContributionDayData[], width: number) {
@@ -101,7 +114,9 @@
 
 		if (weeks.length === 0) return null;
 
-		const maxVal = Math.max(...weeks.map((w) => w.total), 1);
+		// Round the axis up to a readable number so the labels are 4,000 / 2,000 / 0
+		// rather than 3,153 / 1,577 / 0.
+		const maxVal = niceCeiling(Math.max(...weeks.map((w) => w.total), 1));
 		const drawWidth = width - PADDING_LEFT - PADDING_RIGHT;
 		const drawHeight = CHART_HEIGHT - PADDING_TOP - PADDING_BOTTOM;
 
@@ -196,26 +211,26 @@
 					y1={y}
 					x2={containerWidth - PADDING_RIGHT}
 					y2={y}
-					stroke="oklch(0.25 0.015 250)"
+					stroke="var(--border)"
 					stroke-width="1"
 				/>
 			{/each}
 
 			<!-- Area fill -->
-			<path d={chartData.areaPath} fill="oklch(0.55 0.18 145 / 0.1)" />
+			<path d={chartData.areaPath} fill="var(--term-phosphor)" fill-opacity="0.12" />
 
 			<!-- Line -->
 			<polyline
 				points={chartData.linePath}
 				fill="none"
-				stroke="oklch(0.55 0.18 145)"
+				stroke="var(--term-phosphor)"
 				stroke-width="1.5"
-				stroke-linejoin="round"
+				stroke-linejoin="miter"
 			/>
 
 			<!-- A single active point replaces dozens of always-hydrated circles. -->
 			{#if hoveredPoint}
-				<circle cx={hoveredPoint.x} cy={hoveredPoint.y} r="3" fill="oklch(0.55 0.18 145)" />
+				<circle cx={hoveredPoint.x} cy={hoveredPoint.y} r="3" fill="var(--term-phosphor)" />
 			{/if}
 
 			<!-- Y-axis labels -->
@@ -224,15 +239,15 @@
 					x={PADDING_LEFT - 4}
 					y={label.y}
 					text-anchor="end"
-					class="fill-muted-foreground text-[9px]"
+					class="fill-subtle-foreground text-2xs"
 				>
-					{label.value}
+					{numberFormatter.format(label.value)}
 				</text>
 			{/each}
 
 			<!-- X-axis month labels -->
 			{#each chartData.monthLabels as { label, x } (label + x)}
-				<text {x} y={CHART_HEIGHT - 4} class="fill-muted-foreground text-[9px]">
+				<text {x} y={CHART_HEIGHT - 4} class="fill-subtle-foreground text-2xs">
 					{label}
 				</text>
 			{/each}
@@ -248,15 +263,15 @@
 
 		{#if hoveredPoint}
 			<div
-				class="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-[calc(100%+6px)] rounded border border-border bg-card px-2 py-1 text-[10px] whitespace-nowrap text-foreground shadow-lg"
+				class="term-tooltip pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-[calc(100%+6px)] border border-border-control bg-popover px-2 py-1 text-2xs whitespace-nowrap text-foreground"
 				style="left: {tooltipX}px; top: {tooltipY}px"
 			>
 				Week of {hoveredPoint.weekStart}: {hoveredPoint.total} contributions
 			</div>
 		{/if}
 	{:else}
-		<div class="flex h-[120px] items-center justify-center text-sm text-muted-foreground">
-			No contribution data available
+		<div class="flex h-[120px] items-center justify-center text-sm text-subtle-foreground">
+			<span aria-hidden="true" class="pr-1 text-primary">&gt;</span> No contribution data available
 		</div>
 	{/if}
 </div>

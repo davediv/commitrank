@@ -1,17 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { onDestroy } from 'svelte';
-	import {
-		ArrowLeft,
-		ExternalLink,
-		MapPin,
-		Building2,
-		Globe,
-		Share2,
-		Copy,
-		Trophy,
-		GitCommitHorizontal
-	} from '@lucide/svelte';
 	import Avatar from '$lib/components/avatar.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import ContributionHeatmap from '$lib/components/contribution-heatmap.svelte';
@@ -45,6 +34,26 @@
 		'30days': '30 Days',
 		year: 'Year'
 	};
+
+	// Metadata reads as `finger` output: one aligned label column, one value
+	// column. Labels replace the icons the previous design used, which is what
+	// this style asks for and what makes the block scannable.
+	const metadata = $derived(
+		[
+			{ label: 'loc', value: data.profile.location, href: null },
+			{ label: 'org', value: data.profile.company, href: null },
+			{
+				label: 'www',
+				value: data.profile.blog?.replace(/^https?:\/\//, '') ?? null,
+				href: data.profile.blog
+					? data.profile.blog.startsWith('http')
+						? data.profile.blog
+						: `https://${data.profile.blog}`
+					: null
+			},
+			{ label: 'joined', value: formatJoinDate(data.profile.created_at), href: null }
+		].filter((row) => row.value)
+	);
 
 	function formatNumber(num: number): string {
 		return numberFormatter.format(num);
@@ -109,143 +118,131 @@
 	/>
 </svelte:head>
 
-<div class="mx-auto max-w-3xl px-4 py-6">
-	<!-- Back link -->
+<div class="max-w-[var(--viz-max)] px-3 py-4">
 	<a
 		href={resolve('/')}
-		class="mb-6 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+		class="term-transition inline-flex h-6 items-center gap-1 text-sm text-subtle-foreground hover:text-primary"
 	>
-		<ArrowLeft class="h-3.5 w-3.5" />
+		<span aria-hidden="true">←</span>
 		Back to leaderboard
 	</a>
 
-	<!-- Profile Header -->
-	<div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start">
+	<!-- Identity -->
+	<div class="mt-4 flex flex-col gap-4 sm:flex-row sm:items-start">
 		<Avatar
 			src={getAvatarUrl(data.profile.github_username, 160)}
 			srcset={getAvatarSrcset(data.profile.github_username)}
-			sizes="80px"
-			alt={data.profile.github_username}
-			initials={data.profile.github_username.slice(0, 2).toUpperCase()}
-			width={80}
-			height={80}
+			sizes="72px"
+			alt=""
+			initials={data.profile.github_username.slice(0, 2)}
+			width={72}
+			height={72}
 			class="shrink-0"
-			fallbackClass="text-xl"
+			fallbackClass="text-lg"
 			loading="eager"
 			fetchpriority="high"
 		/>
 
 		<div class="min-w-0 flex-1">
-			<div class="flex flex-col gap-1">
-				{#if data.profile.display_name}
-					<h1 class="text-xl font-bold">{data.profile.display_name}</h1>
-				{/if}
-				<div class="flex items-center gap-2">
+			<h1 class="text-xl font-medium text-foreground">
+				{data.profile.display_name || data.profile.github_username}
+			</h1>
+
+			<div class="mt-0.5 flex flex-wrap items-center gap-x-2 text-sm">
+				<a
+					href="https://github.com/{data.profile.github_username}"
+					target="_blank"
+					rel="noopener noreferrer"
+					class="term-transition inline-flex h-6 items-center text-primary hover:underline"
+				>
+					@{data.profile.github_username}<span
+						aria-hidden="true"
+						class="pl-1 text-subtle-foreground">↗</span
+					>
+				</a>
+				{#if data.profile.twitter_handle}
+					<span aria-hidden="true" class="text-disabled">·</span>
 					<a
-						href="https://github.com/{data.profile.github_username}"
+						href="https://x.com/{data.profile.twitter_handle}"
 						target="_blank"
 						rel="noopener noreferrer"
-						class="group flex items-center gap-1 text-muted-foreground hover:text-primary"
+						class="term-transition inline-flex h-6 items-center text-muted-foreground hover:text-primary"
 					>
-						@{data.profile.github_username}
-						<ExternalLink class="h-3 w-3 opacity-0 transition-opacity group-hover:opacity-50" />
+						@{data.profile.twitter_handle}
 					</a>
-					{#if data.profile.twitter_handle}
-						<span class="text-muted-foreground/40">·</span>
-						<a
-							href="https://x.com/{data.profile.twitter_handle}"
-							target="_blank"
-							rel="noopener noreferrer"
-							class="text-sm text-muted-foreground hover:text-primary"
-						>
-							@{data.profile.twitter_handle}
-						</a>
-					{/if}
-				</div>
+				{/if}
 			</div>
 
 			{#if data.profile.bio}
-				<p class="mt-2 text-sm text-muted-foreground">{data.profile.bio}</p>
+				<p class="mt-2 max-w-[var(--measure)] text-sm text-muted-foreground">{data.profile.bio}</p>
 			{/if}
 
-			<div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
-				{#if data.profile.location}
-					<span class="flex items-center gap-1">
-						<MapPin class="h-3 w-3" />
-						{data.profile.location}
-					</span>
-				{/if}
-				{#if data.profile.company}
-					<span class="flex items-center gap-1">
-						<Building2 class="h-3 w-3" />
-						{data.profile.company}
-					</span>
-				{/if}
-				{#if data.profile.blog}
-					<a
-						href={data.profile.blog.startsWith('http')
-							? data.profile.blog
-							: `https://${data.profile.blog}`}
-						target="_blank"
-						rel="noopener noreferrer"
-						class="flex items-center gap-1 hover:text-primary"
-					>
-						<Globe class="h-3 w-3" />
-						{data.profile.blog.replace(/^https?:\/\//, '')}
-					</a>
-				{/if}
-			</div>
-
-			<p class="mt-1 text-xs text-muted-foreground/60">
-				Joined CommitRank {formatJoinDate(data.profile.created_at)}
-			</p>
+			{#if metadata.length > 0}
+				<dl class="mt-3 grid grid-cols-[3.5rem_1fr] gap-x-2 gap-y-0.5 text-sm">
+					{#each metadata as row (row.label)}
+						<dt class="term-label pt-[0.2rem]">{row.label}</dt>
+						<dd class="min-w-0 truncate text-muted-foreground">
+							{#if row.href}
+								<a
+									href={row.href}
+									target="_blank"
+									rel="noopener noreferrer"
+									class="term-transition hover:text-primary">{row.value}</a
+								>
+							{:else}
+								{row.value}
+							{/if}
+						</dd>
+					{/each}
+				</dl>
+			{/if}
 		</div>
 	</div>
 
-	<!-- Stats Cards -->
-	<div class="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+	<!-- Period readout: one strip divided by rules, not four cards. -->
+	<div class="mt-5 grid grid-cols-2 border border-border sm:grid-cols-4">
 		{#each data.profile.contributions as period (period.period)}
-			<div class="rounded-md border border-border bg-muted/20 p-3">
-				<p class="text-xs text-muted-foreground">{periodLabels[period.period]}</p>
-				<p class="mt-1 font-mono text-lg font-bold text-primary">
+			<div
+				class="border-r border-b border-border px-3 py-2 last:border-r-0 sm:border-b-0 [&:nth-child(2)]:border-r-0 sm:[&:nth-child(2)]:border-r"
+			>
+				<p class="term-label">{periodLabels[period.period]}</p>
+				<p
+					class="mt-1 text-lg {period.contributions > 0
+						? 'text-primary'
+						: 'text-subtle-foreground'}"
+				>
 					{formatNumber(period.contributions)}
 				</p>
-				<div class="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
-					<Trophy class="h-3 w-3" />
-					Rank #{period.rank || '-'}
-				</div>
+				<p
+					class="text-xs {period.contributions > 0
+						? 'text-muted-foreground'
+						: 'text-subtle-foreground'}"
+				>
+					rank #{period.rank || '-'}
+				</p>
 			</div>
 		{/each}
 	</div>
 
-	<!-- Contribution Heatmap -->
-	<div class="deferred-section mb-6">
-		<h2 class="mb-3 flex items-center gap-2 text-sm font-medium">
-			<GitCommitHorizontal class="h-4 w-4" />
-			Contributions
-		</h2>
-		<div class="rounded-md border border-border bg-muted/20 p-3">
+	<!-- Contribution heatmap: finally has room to be read. -->
+	<section class="deferred-section mt-5">
+		<h2 class="term-label mb-2">Contributions</h2>
+		<div class="term-panel overflow-x-auto p-3">
 			<ContributionHeatmap contributions={data.dailyContributions} />
 		</div>
-	</div>
+	</section>
 
-	<!-- Contribution Trend -->
-	<div class="deferred-section mb-6">
-		<h2 class="mb-3 text-sm font-medium">Weekly Trend</h2>
-		<div class="rounded-md border border-border bg-muted/20 p-3">
+	<section class="deferred-section mt-5">
+		<h2 class="term-label mb-2">Weekly Trend</h2>
+		<div class="term-panel p-3">
 			<ContributionChart contributions={data.dailyContributions} />
 		</div>
-	</div>
+	</section>
 
-	<!-- Share Section -->
-	<div class="flex items-center gap-2">
-		<Button variant="outline" size="sm" onclick={shareOnX}>
-			<Share2 class="mr-1.5 h-3.5 w-3.5" />
-			Share on X
-		</Button>
+	<div class="mt-5 flex items-center gap-2">
+		<Button variant="outline" size="sm" onclick={shareOnX}>Share on X ↗</Button>
 		<Button variant="outline" size="sm" onclick={copyLink}>
-			<Copy class="mr-1.5 h-3.5 w-3.5" />
-			{copyState === 'success' ? 'Copied' : copyState === 'error' ? 'Copy failed' : 'Copy Link'}
+			{copyState === 'success' ? '✓ Copied' : copyState === 'error' ? '✗ Copy failed' : 'Copy Link'}
 		</Button>
 		<span class="sr-only" aria-live="polite">
 			{copyState === 'success'
