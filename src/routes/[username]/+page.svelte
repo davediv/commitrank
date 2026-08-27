@@ -118,7 +118,7 @@
 	/>
 </svelte:head>
 
-<div class="max-w-[var(--viz-max)] px-3 py-4">
+<div class="mx-auto max-w-[var(--viz-max)] px-3 py-4">
 	<a
 		href={resolve('/')}
 		class="term-transition inline-flex h-6 items-center gap-1 text-sm text-subtle-foreground hover:text-primary"
