@@ -5,6 +5,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import ContributionHeatmap from '$lib/components/contribution-heatmap.svelte';
 	import ContributionChart from '$lib/components/contribution-chart.svelte';
+	import ShareCardDialog from '$lib/components/share-card-dialog.svelte';
 	import type { PageData } from './$types';
 
 	interface Props {
@@ -27,6 +28,7 @@
 	});
 	let copyState: 'idle' | 'success' | 'error' = $state('idle');
 	let copyResetTimer: ReturnType<typeof setTimeout> | undefined;
+	let shareCard: ReturnType<typeof ShareCardDialog> | null = $state(null);
 
 	const periodLabels: Record<string, string> = {
 		today: 'Today',
@@ -239,7 +241,8 @@
 		</div>
 	</section>
 
-	<div class="mt-5 flex items-center gap-2">
+	<div class="mt-5 flex flex-wrap items-center gap-2">
+		<Button size="sm" onclick={() => shareCard?.open()}>Save as Image</Button>
 		<Button variant="outline" size="sm" onclick={shareOnX}>Share on X ↗</Button>
 		<Button variant="outline" size="sm" onclick={copyLink}>
 			{copyState === 'success' ? '✓ Copied' : copyState === 'error' ? '✗ Copy failed' : 'Copy Link'}
@@ -253,3 +256,9 @@
 		</span>
 	</div>
 </div>
+
+<ShareCardDialog
+	bind:this={shareCard}
+	profile={data.profile}
+	dailyContributions={data.dailyContributions}
+/>
