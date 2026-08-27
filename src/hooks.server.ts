@@ -99,11 +99,24 @@ function createCacheableResponse(response: Response): Response {
 }
 
 /**
- * Check if origin is allowed
+ * Check if origin is allowed.
+ *
+ * The app's own origin always counts: a request whose `Origin` equals the site's
+ * is by definition not cross-site. Without that clause the hard-coded list is
+ * the whole allowlist, so any host that is not literally commitrank.dev — a
+ * preview deployment, or a dev server that had to take a port other than 5173 —
+ * rejects the site's own requests. That only started to matter once something
+ * asked for an /api response in CORS mode: the profile share card loads the
+ * avatar with `crossOrigin`, which is what makes the browser send `Origin` on a
+ * same-origin GET at all.
  */
-function isOriginAllowed(origin: string | null, allowedOrigins: string[]): boolean {
+function isOriginAllowed(
+	origin: string | null,
+	allowedOrigins: string[],
+	selfOrigin: string
+): boolean {
 	if (!origin) return false;
-	return allowedOrigins.includes(origin);
+	return origin === selfOrigin || allowedOrigins.includes(origin);
 }
 
 /**
@@ -145,7 +158,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 		// Handle preflight OPTIONS requests
 		if (request.method === 'OPTIONS') {
-			if (origin && isOriginAllowed(origin, allowedOrigins)) {
+			if (origin && isOriginAllowed(origin, allowedOrigins, url.origin)) {
 				return addCorsHeaders(new Response(null, { status: 204 }), origin, true);
 			}
 			// Non-allowed origin for preflight
@@ -153,7 +166,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		}
 
 		// For actual requests, check origin
-		if (origin && !isOriginAllowed(origin, allowedOrigins)) {
+		if (origin && !isOriginAllowed(origin, allowedOrigins, url.origin)) {
 			return new Response('Forbidden', { status: 403 });
 		}
 
@@ -161,7 +174,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		const response = await resolve(event);
 
 		// Add CORS headers if origin is allowed
-		if (origin && isOriginAllowed(origin, allowedOrigins)) {
+		if (origin && isOriginAllowed(origin, allowedOrigins, url.origin)) {
 			return addCorsHeaders(response, origin);
 		}
 
