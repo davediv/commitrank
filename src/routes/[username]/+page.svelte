@@ -258,7 +258,7 @@
 		</div>
 	</section>
 
-	<div class="mt-5 flex flex-wrap items-center gap-2">
+	<div class="mt-5 flex flex-wrap items-center justify-center gap-2">
 		<Button size="sm" onclick={() => shareCard?.open()}>Save as Image</Button>
 		<Button variant="outline" size="sm" onclick={shareOnX}>Share on X ↗</Button>
 		<Button variant="outline" size="sm" onclick={copyLink}>
