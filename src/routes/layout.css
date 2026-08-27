@@ -3,66 +3,107 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * GitHub Dark Minimalist Theme
- * Inspired by GitHub's design system, stripped to essentials
+ * Terminal — phosphor on near-black, monospace, character-grid density.
+ *
+ * Two layers: primitives describe what a value IS, semantics describe what it is
+ * FOR. Components only ever reference semantics.
+ *
+ * Every text-on-surface pair below is contrast-checked against --term-black-1.
+ * Ratios are noted inline; nothing under 4.5:1 carries text.
  */
 
 :root {
-	/* Base radius */
-	--radius: 0.375rem;
+	/* ---- primitives ------------------------------------------------------ */
 
-	/* Light mode - rarely used, but available */
-	--background: oklch(0.985 0 0);
-	--foreground: oklch(0.145 0.02 265);
-	--card: oklch(1 0 0);
-	--card-foreground: oklch(0.145 0.02 265);
-	--popover: oklch(1 0 0);
-	--popover-foreground: oklch(0.145 0.02 265);
-	--primary: oklch(0.45 0.15 145);
-	--primary-foreground: oklch(1 0 0);
-	--secondary: oklch(0.96 0.005 265);
-	--secondary-foreground: oklch(0.145 0.02 265);
-	--muted: oklch(0.96 0.005 265);
-	--muted-foreground: oklch(0.5 0.02 265);
-	--accent: oklch(0.96 0.005 265);
-	--accent-foreground: oklch(0.145 0.02 265);
-	--destructive: oklch(0.55 0.22 25);
-	--border: oklch(0.91 0.005 265);
-	--input: oklch(0.91 0.005 265);
-	--ring: oklch(0.45 0.15 145);
-	--success: oklch(0.55 0.18 145);
+	/* Never pure #000 — black reads as a void, #0C0C0D reads as a screen. */
+	--term-black-0: #08080a; /* sunken   */
+	--term-black-1: #0c0c0d; /* surface  */
+	--term-black-2: #141416; /* raised   */
+	--term-black-3: #1a1a1e; /* overlay / hover */
+	--term-black-4: #26262a; /* decorative rule — 1.30:1, never a control edge */
+
+	--term-gray-0: #52525b; /* DISABLED CONTROLS ONLY — 2.53:1, exempt from 1.4.3.
+	                           Never use it for placeholder or meta text. */
+	--term-gray-1: #6a6a74; /*  >=3.24:1 on every surface — control boundaries */
+	--term-gray-2: #8b8b94; /*  5.79:1 — tertiary text              */
+	--term-gray-3: #a1a1aa; /*  7.63:1 — secondary text             */
+	--term-gray-4: #d4d4d8; /* 13.23:1 — primary text               */
+
+	--term-phosphor: #00e5a0; /* 11.84:1 */
+	--term-green: #3fb950; /*  7.70:1 */
+	--term-amber: #d29922; /*  7.75:1 */
+	--term-red: #f85149; /*  5.83:1 */
+	--term-blue: #58a6ff; /*  7.74:1 */
+
+	/* Heatmap ramp — every adjacent step separated by >=1.5:1 so levels are
+	   distinguishable without relying on the tooltip. */
+	--term-heat-0: #17171a;
+	--term-heat-1: #0b3f2e;
+	--term-heat-2: #0e6b4b;
+	--term-heat-3: #00a878;
+	--term-heat-4: #00e5a0;
+
+	/* ---- semantics ------------------------------------------------------- */
+
+	--background: var(--term-black-1);
+	--foreground: var(--term-gray-4);
+	--card: var(--term-black-2);
+	--card-foreground: var(--term-gray-4);
+	--popover: var(--term-black-3);
+	--popover-foreground: var(--term-gray-4);
+	--primary: var(--term-phosphor);
+	--primary-foreground: var(--term-black-1);
+	--secondary: var(--term-black-3);
+	--secondary-foreground: var(--term-gray-4);
+	--muted: var(--term-black-2);
+	--muted-foreground: var(--term-gray-3);
+	--subtle-foreground: var(--term-gray-2);
+	--accent: var(--term-black-3); /* subtle hover surface, not the phosphor */
+	--accent-foreground: var(--term-gray-4);
+	--destructive: var(--term-red);
+	--success: var(--term-green);
+	--warning: var(--term-amber);
+	--info: var(--term-blue);
+
+	--border: var(--term-black-4); /* decorative separators */
+	--border-control: var(--term-gray-1); /* anything that identifies a control */
+	--input: var(--term-gray-1);
+	--ring: var(--term-phosphor);
+	--disabled: var(--term-gray-0);
+
+	/* ---- shape ----------------------------------------------------------- */
+	/* Small enough to read as a rendered box, never as a card. */
+	--radius: 2px;
+
+	/* ---- elevation ------------------------------------------------------- */
+	/* Absolutely flat, with one exception: floating overlays. */
+	--shadow-overlay: 0 8px 24px rgb(0 0 0 / 0.6);
+
+	/* ---- motion ---------------------------------------------------------- */
+	/* Latency is the aesthetic. Nothing here delays a response. */
+	--duration-fast: 80ms;
+	--duration-normal: 100ms;
+	--ease-out: linear;
+
+	/* ---- layout ---------------------------------------------------------- */
+	--shell-header: 2.25rem;
+	--shell-status: 1.75rem;
+	--measure: 68ch;
+	/* Charts stop growing here; past this a heatmap cell is a tile, not a day. */
+	--viz-max: 68rem;
 }
 
-/* Dark mode - the primary theme */
-.dark,
-:root {
-	--background: oklch(0.13 0.015 250);
-	--foreground: oklch(0.93 0.01 250);
-	--card: oklch(0.17 0.015 250);
-	--card-foreground: oklch(0.93 0.01 250);
-	--popover: oklch(0.17 0.015 250);
-	--popover-foreground: oklch(0.93 0.01 250);
-	--primary: oklch(0.55 0.18 145);
-	--primary-foreground: oklch(1 0 0);
-	--secondary: oklch(0.22 0.015 250);
-	--secondary-foreground: oklch(0.93 0.01 250);
-	--muted: oklch(0.22 0.015 250);
-	--muted-foreground: oklch(0.6 0.02 250);
-	--accent: oklch(0.22 0.015 250);
-	--accent-foreground: oklch(0.93 0.01 250);
-	--destructive: oklch(0.6 0.2 25);
-	--border: oklch(0.28 0.015 250);
-	--input: oklch(0.22 0.015 250);
-	--ring: oklch(0.55 0.18 145);
-	--success: oklch(0.55 0.18 145);
-}
+/* Single true mode: the semantics above already are the dark theme, so .dark
+   inherits rather than redefining. */
 
 @theme inline {
-	--radius-sm: calc(var(--radius) - 2px);
+	--radius-sm: 0px;
 	--radius-md: var(--radius);
-	--radius-lg: calc(var(--radius) + 2px);
-	--radius-xl: calc(var(--radius) + 6px);
+	--radius-lg: calc(var(--radius) + 1px);
+	--radius-xl: calc(var(--radius) + 2px);
+
 	--color-background: var(--background);
+	--color-surface-sunken: var(--term-black-0);
 	--color-foreground: var(--foreground);
 	--color-card: var(--card);
 	--color-card-foreground: var(--card-foreground);
@@ -74,28 +115,79 @@
 	--color-secondary-foreground: var(--secondary-foreground);
 	--color-muted: var(--muted);
 	--color-muted-foreground: var(--muted-foreground);
+	--color-subtle-foreground: var(--subtle-foreground);
 	--color-accent: var(--accent);
 	--color-accent-foreground: var(--accent-foreground);
 	--color-destructive: var(--destructive);
+	--color-success: var(--success);
+	--color-warning: var(--warning);
+	--color-info: var(--info);
 	--color-border: var(--border);
+	--color-border-control: var(--border-control);
 	--color-input: var(--input);
 	--color-ring: var(--ring);
-	--color-success: var(--success);
-	--color-sidebar: var(--card);
-	--color-sidebar-foreground: var(--foreground);
-	--color-sidebar-primary: var(--primary);
-	--color-sidebar-primary-foreground: var(--primary-foreground);
-	--color-sidebar-accent: var(--accent);
-	--color-sidebar-accent-foreground: var(--accent-foreground);
-	--color-sidebar-border: var(--border);
-	--color-sidebar-ring: var(--ring);
+	--color-disabled: var(--disabled);
 
-	/* GitHub-inspired system font stack */
-	--font-sans:
-		-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif,
-		'Apple Color Emoji', 'Segoe UI Emoji';
+	--color-heat-0: var(--term-heat-0);
+	--color-heat-1: var(--term-heat-1);
+	--color-heat-2: var(--term-heat-2);
+	--color-heat-3: var(--term-heat-3);
+	--color-heat-4: var(--term-heat-4);
+
+	/*
+	 * One mono, used for everything. No webfont: this project's CSP sets
+	 * font-src 'self', so a hosted face is blocked outright and a self-hosted
+	 * one costs ~120KB against a style whose whole doctrine is that latency is
+	 * the aesthetic. JetBrains Mono leads the stack for the many developers who
+	 * already have it installed; SF Mono / ui-monospace cover everyone else.
+	 */
 	--font-mono:
-		ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+		'JetBrains Mono', 'SF Mono', 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas,
+		'Liberation Mono', monospace;
+	--font-sans: var(--font-mono);
+
+	/*
+	 * Narrow and small — terminal UIs run small, 13px body is correct.
+	 * Every step ships size, line-height, tracking and weight together;
+	 * leading is exactly 1.4 in data grids so rows keep a rhythm.
+	 */
+	--text-2xs: 0.6875rem;
+	--text-2xs--line-height: 1.4;
+	--text-2xs--letter-spacing: 0.02em;
+	--text-xs: 0.75rem;
+	--text-xs--line-height: 1.4;
+	--text-xs--letter-spacing: 0.01em;
+	--text-sm: 0.8125rem;
+	--text-sm--line-height: 1.5;
+	--text-sm--letter-spacing: 0em;
+	--text-base: 0.875rem;
+	--text-base--line-height: 1.5;
+	--text-base--letter-spacing: 0em;
+	--text-lg: 1rem;
+	--text-lg--line-height: 1.4;
+	--text-lg--letter-spacing: -0.005em;
+	--text-xl: 1.25rem;
+	--text-xl--line-height: 1.3;
+	--text-xl--letter-spacing: -0.01em;
+	--text-2xl: 1.75rem;
+	--text-2xl--line-height: 1.2;
+	--text-2xl--letter-spacing: -0.02em;
+	--text-2xl--font-weight: 700;
+
+	--leading-grid: 1.4;
+
+	--ease-term: var(--ease-out);
+	--animate-cursor: cursor-blink 1s steps(2, jump-none) infinite;
+
+	@keyframes cursor-blink {
+		0%,
+		100% {
+			opacity: 1;
+		}
+		50% {
+			opacity: 0;
+		}
+	}
 }
 
 @layer base {
@@ -104,148 +196,162 @@
 	}
 
 	html {
-		/* Force dark mode */
 		color-scheme: dark;
+		/* Reserve the scrollbar so navigating between a 1-page and 2-page
+		   leaderboard doesn't shift the layout horizontally. */
+		scrollbar-gutter: stable;
 	}
 
 	body {
-		@apply bg-background text-foreground antialiased;
-		font-feature-settings:
-			'rlig' 1,
-			'calt' 1;
+		@apply bg-background font-mono text-sm text-foreground antialiased;
+		/* Ligatures belong in code, not in UI labels. */
+		font-variant-ligatures: none;
+		font-optical-sizing: auto;
+		/* Data lines up because the font makes it. */
+		font-variant-numeric: tabular-nums;
 	}
 
-	/* Subtle focus ring */
+	/* A control's focus ring is phosphor at 11.84:1 — far past the 3:1 floor,
+	   and the one place colour is allowed to shout. */
 	:focus-visible {
-		@apply outline-2 outline-offset-2 outline-ring;
+		@apply rounded-none outline-2 outline-offset-1 outline-ring;
 	}
 
-	/* Custom scrollbar for dark theme */
+	/* One scrim for every modal surface in the product. */
+	::backdrop {
+		background: rgb(0 0 0 / 0.6);
+	}
+
+	::selection {
+		background: var(--term-phosphor);
+		color: var(--term-black-1);
+	}
+
 	::-webkit-scrollbar {
-		width: 8px;
-		height: 8px;
+		width: 10px;
+		height: 10px;
 	}
 
 	::-webkit-scrollbar-track {
-		@apply bg-transparent;
+		background: var(--term-black-0);
 	}
 
 	::-webkit-scrollbar-thumb {
-		@apply rounded-full bg-border;
+		background: var(--term-black-4);
+		border: 2px solid var(--term-black-0);
 	}
 
-	::-webkit-scrollbar-thumb:hover {
-		@apply bg-muted-foreground/50;
-	}
-}
-
-/* GitHub-style contribution green for numbers */
-.contrib-count {
-	@apply font-mono text-success;
-}
-
-/* Rank badge styling */
-.rank-badge {
-	@apply inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold;
-}
-
-.rank-badge-gold {
-	@apply bg-amber-500/20 text-amber-400;
-}
-
-.rank-badge-silver {
-	@apply bg-slate-400/20 text-slate-300;
-}
-
-.rank-badge-bronze {
-	@apply bg-orange-600/20 text-orange-400;
-}
-
-/* Table row hover - subtle like GitHub */
-.table-row-hover {
-	@apply transition-colors hover:bg-muted/50;
-}
-
-/* Clean link styling */
-.link-subtle {
-	@apply text-foreground no-underline transition-colors hover:text-primary;
-}
-
-/* Stats pill */
-.stat-pill {
-	@apply inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground;
-}
-
-/* Hero gradient animation - GitHub inspired */
-.hero-gradient {
-	background: var(--background);
-}
-
-.hero-glow {
-	position: absolute;
-	inset: 0;
-	background:
-		radial-gradient(ellipse 80% 50% at 50% -20%, rgba(120, 119, 198, 0.15), transparent),
-		radial-gradient(ellipse 60% 40% at 20% 60%, rgba(45, 212, 191, 0.1), transparent),
-		radial-gradient(ellipse 60% 40% at 80% 60%, rgba(168, 85, 247, 0.1), transparent);
-	opacity: 0.8;
-}
-
-@keyframes hero-pulse {
-	0%,
-	100% {
-		opacity: 0.6;
-		transform: scale(1);
-	}
-	50% {
-		opacity: 1;
-		transform: scale(1.05);
+	@media (hover: hover) and (pointer: fine) {
+		::-webkit-scrollbar-thumb:hover {
+			background: var(--border-control);
+		}
 	}
 }
 
-.hero-title {
-	background: linear-gradient(
-		135deg,
-		oklch(0.93 0.01 250) 0%,
-		oklch(0.7 0.15 280) 25%,
-		oklch(0.65 0.2 320) 50%,
-		oklch(0.6 0.18 145) 75%,
-		oklch(0.93 0.01 250) 100%
-	);
-	background-size: 200% 200%;
-	-webkit-background-clip: text;
-	background-clip: text;
-	color: transparent;
-	background-position: 50% 50%;
-}
-
-@keyframes gradient-shift {
-	0%,
-	100% {
-		background-position: 0% 50%;
-	}
-	50% {
-		background-position: 100% 50%;
-	}
-}
-
-@media (prefers-reduced-motion: no-preference) and (min-width: 640px) {
-	.hero-glow {
-		animation: hero-pulse 16s ease-in-out infinite;
+@layer components {
+	/*
+	 * Structure from characters. An uppercase, tracked-out label is how a
+	 * terminal names a region — it replaces the border a card would use.
+	 */
+	.term-label {
+		@apply text-2xs font-medium text-subtle-foreground uppercase;
+		letter-spacing: 0.08em;
 	}
 
-	.hero-title {
-		animation: gradient-shift 12s ease-in-out infinite;
+	/* A bordered rectangle, not a card: 1px at 1.30:1, visible on inspection. */
+	.term-panel {
+		@apply border border-border bg-card;
+	}
+
+	/* Block cursor, 1s steps — the one ambient loop in the system. */
+	.term-cursor {
+		@apply inline-block w-[0.5em] bg-primary align-baseline;
+		height: 1em;
+		animation: var(--animate-cursor);
+	}
+
+	/*
+	 * htop-style meter. Shows share of the page leader — the sort order already
+	 * says who is ahead, this says by how much, from data already loaded.
+	 */
+	.term-meter {
+		@apply block h-[2px] w-full overflow-hidden bg-border;
+	}
+
+	.term-meter > span {
+		@apply block h-full bg-primary;
+	}
+
+	/*
+	 * The system's one transition. Colour only — nothing here can trigger
+	 * layout, and at 80ms linear nothing here delays a response.
+	 */
+	.term-transition {
+		transition-property: color, background-color, border-color, opacity;
+		transition-duration: var(--duration-fast);
+		transition-timing-function: var(--ease-out);
+	}
+
+	/* Press feedback fires on pointer-down and must not be eased back in. */
+	.term-transition:active {
+		transition-duration: 0s;
+	}
+
+	/*
+	 * Absolutely flat, with one exception: floating overlays get a shadow so
+	 * they read as detached from the grid beneath them.
+	 */
+	.term-tooltip {
+		border-radius: var(--radius);
+		box-shadow: var(--shadow-overlay);
+	}
+
+	/* <kbd> as a 1px-bordered mono box. */
+	.term-kbd {
+		@apply inline-flex h-[1.25rem] min-w-[1.25rem] items-center justify-center border border-border-control px-1 text-2xs text-muted-foreground;
+		border-radius: var(--radius);
 	}
 }
 
-.success-dialog::backdrop {
-	background: rgb(0 0 0 / 0.55);
-	backdrop-filter: blur(2px);
+@layer utilities {
+	/*
+	 * Optional CRT texture — once, globally, at 3%. Any stronger and it stops
+	 * reading as a screen and starts reading as an effect.
+	 */
+	.term-scanlines::after {
+		content: '';
+		position: fixed;
+		inset: 0;
+		z-index: 100;
+		pointer-events: none;
+		background: repeating-linear-gradient(
+			to bottom,
+			rgb(255 255 255 / 0.03) 0px,
+			rgb(255 255 255 / 0.03) 1px,
+			transparent 1px,
+			transparent 3px
+		);
+	}
+
+	/* Skip paint/layout for heavy profile visualizations until they near view. */
+	.deferred-section {
+		content-visibility: auto;
+		contain-intrinsic-size: auto 220px;
+	}
 }
 
-/* Skip paint/layout for heavy profile visualizations until they approach view. */
-.deferred-section {
-	content-visibility: auto;
-	contain-intrinsic-size: auto 220px;
+/*
+ * Reduced motion: the cursor blink is the only ambient loop in the product, and
+ * it is the only thing that needs stopping. Everything else is <=100ms feedback.
+ */
+@media (prefers-reduced-motion: reduce) {
+	.term-cursor {
+		animation: none;
+	}
+
+	*,
+	*::before,
+	*::after {
+		transition-duration: 0.01ms !important;
+	}
 }

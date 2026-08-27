@@ -2,10 +2,10 @@
 	import { navigating } from '$app/stores';
 	import { resolve } from '$app/paths';
 	import { onMount } from 'svelte';
-	import { Users, GitCommitHorizontal, Clock, CheckCircle, RefreshCw } from '@lucide/svelte';
 	import Avatar from '$lib/components/avatar.svelte';
+	import Meter from '$lib/components/meter.svelte';
+	import Kbd from '$lib/components/kbd.svelte';
 	import { Button } from '$lib/components/ui/button';
-	import { formatUTCClockTime } from '$lib/time';
 	import type { PageData } from './$types';
 
 	interface Props {
@@ -31,10 +31,44 @@
 		$state(null);
 	let showSuccessModal = $state(false);
 	let successDialog: HTMLDialogElement | null = $state(null);
-	let utcNow: Date | null = $state(null);
-	const utcNowLabel = $derived(utcNow ? formatUTCClockTime(utcNow) : '--:--:-- UTC');
 	const numberFormatter = new Intl.NumberFormat('en-US');
-	const todayUtc = new Date().toISOString().slice(0, 10);
+
+	// Client-side filter over the rows already on screen. ⌘K searches everyone;
+	// this narrows what you are looking at, which is the commoner need.
+	let filter = $state('');
+	let filterInput: HTMLInputElement | null = $state(null);
+
+	const rows = $derived.by(() => {
+		const query = filter.trim().toLowerCase();
+		if (!query) return data.leaderboard.leaderboard;
+		return data.leaderboard.leaderboard.filter(
+			(entry) =>
+				entry.github_username.toLowerCase().includes(query) ||
+				(entry.display_name?.toLowerCase().includes(query) ?? false) ||
+				(entry.twitter_handle?.toLowerCase().includes(query) ?? false)
+		);
+	});
+
+	// The meter reads as share of the page leader, so it needs the page maximum.
+	const maxContributions = $derived(
+		data.leaderboard.leaderboard.reduce((max, entry) => Math.max(max, entry.contributions), 0)
+	);
+
+	// A braille spinner is this style's loading signal. It runs only while a
+	// navigation is in flight and stops dead when it lands.
+	const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+	let spinnerFrame = $state(0);
+
+	$effect(() => {
+		if (!isLoading) {
+			spinnerFrame = 0;
+			return;
+		}
+		const timer = window.setInterval(() => {
+			spinnerFrame = (spinnerFrame + 1) % SPINNER_FRAMES.length;
+		}, 80);
+		return () => window.clearInterval(timer);
+	});
 
 	onMount(() => {
 		// Check for join_success cookie
@@ -61,16 +95,19 @@
 		}
 	});
 
-	onMount(() => {
-		utcNow = new Date();
-
-		const timer = window.setInterval(() => {
-			utcNow = new Date();
-		}, 1000);
-
-		return () => {
-			window.clearInterval(timer);
-		};
+	// `/` focuses the filter, the way it does in less, vim and fzf — but never
+	// while the user is already typing somewhere.
+	$effect(() => {
+		function onKeydown(event: KeyboardEvent) {
+			if (event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey) return;
+			const target = event.target as HTMLElement | null;
+			if (target?.closest('input, textarea, select, [contenteditable]')) return;
+			event.preventDefault();
+			filterInput?.focus();
+			filterInput?.select();
+		}
+		window.addEventListener('keydown', onKeydown);
+		return () => window.removeEventListener('keydown', onKeydown);
 	});
 
 	function dismissSuccess() {
@@ -98,63 +135,20 @@
 		return [32, 64, 96].map((size) => `${getAvatarUrl(username, size)} ${size}w`).join(', ');
 	}
 
-	function formatRelativeTime(isoString: string | null): string {
-		if (!isoString) return 'Never';
-
-		const date = new Date(isoString);
-		const now = new Date();
-		const diffMs = now.getTime() - date.getTime();
-		const diffMins = Math.floor(diffMs / 60000);
-		const diffHours = Math.floor(diffMins / 60);
-		const diffDays = Math.floor(diffHours / 24);
-
-		if (diffMins < 1) return 'Just now';
-		if (diffMins < 60) return `${diffMins}m ago`;
-		if (diffHours < 24) return `${diffHours}h ago`;
-		return `${diffDays}d ago`;
-	}
-
-	function formatTimeUntil(isoString: string | null): string {
-		if (!isoString) return 'Unknown';
-
-		const target = new Date(isoString);
-		const now = new Date();
-		const diffMs = target.getTime() - now.getTime();
-
-		if (diffMs <= 0) return 'Soon';
-
-		const diffMins = Math.floor(diffMs / 60000);
-		const diffHours = Math.floor(diffMins / 60);
-		const remainingMins = diffMins % 60;
-
-		if (diffHours >= 1) {
-			return remainingMins > 0 ? `${diffHours}h ${remainingMins}m` : `${diffHours}h`;
-		}
-		return `${diffMins}m`;
-	}
-
-	function formatUTCTime(isoString: string | null): string {
-		if (!isoString) return 'Never';
-
-		const date = new Date(isoString);
-		return (
-			date.toLocaleString('en-US', {
-				month: 'short',
-				day: 'numeric',
-				year: 'numeric',
-				hour: '2-digit',
-				minute: '2-digit',
-				timeZone: 'UTC',
-				hour12: false
-			}) + ' UTC'
-		);
+	// Rank is this product's primary axis, so it is expressed in the one
+	// hierarchy tool a terminal actually has: brightness. Phosphor for the
+	// leader, full white for the podium, subtle for the field.
+	function rankTone(rank: number): string {
+		if (rank === 1) return 'text-primary';
+		if (rank <= 3) return 'text-foreground';
+		return 'text-subtle-foreground';
 	}
 
 	// Period tabs configuration
 	const periods = [
 		{ value: 'today', label: 'Today' },
-		{ value: '7days', label: '7d' },
-		{ value: '30days', label: '30d' },
+		{ value: '7days', label: '7 Days' },
+		{ value: '30days', label: '30 Days' },
 		{ value: 'year', label: 'Year' }
 	];
 </script>
@@ -185,7 +179,7 @@
 {#if successMessage}
 	<dialog
 		bind:this={successDialog}
-		class="success-dialog w-[calc(100%-2rem)] max-w-sm rounded-lg border border-border bg-background p-6 text-foreground shadow-2xl"
+		class="m-auto w-[calc(100%-2rem)] max-w-sm border border-primary bg-card p-4 text-foreground"
 		aria-labelledby="welcome-title"
 		aria-describedby="welcome-description"
 		onclose={() => (showSuccessModal = false)}
@@ -193,190 +187,199 @@
 			if (event.target === event.currentTarget) dismissSuccess();
 		}}
 	>
-		<div class="flex flex-col gap-4">
-			<div class="flex flex-col gap-2">
-				<h2 id="welcome-title" class="flex items-center gap-2 text-base font-semibold">
-					<CheckCircle class="h-4 w-4 text-primary" />
-					Welcome to CommitRank
-				</h2>
-				<p id="welcome-description" class="text-sm text-muted-foreground">
-					<strong class="text-foreground">@{successMessage.username}</strong> joined with
-					<strong class="text-primary">{formatNumber(successMessage.contributions)}</strong>
-					contributions.
-				</p>
-			</div>
+		<div class="flex flex-col gap-3">
+			<h2 id="welcome-title" class="text-sm font-medium text-primary">
+				<span aria-hidden="true">✓</span> Welcome to CommitRank
+			</h2>
+			<p id="welcome-description" class="text-sm text-muted-foreground">
+				<strong class="font-medium text-foreground">@{successMessage.username}</strong> joined with
+				<strong class="font-medium text-primary"
+					>{formatNumber(successMessage.contributions)}</strong
+				>
+				contributions.
+			</p>
 			<div class="flex justify-end">
-				<Button onclick={dismissSuccess} size="sm">View Leaderboard</Button>
+				<Button onclick={dismissSuccess} size="sm" kbd="↵">View leaderboard</Button>
 			</div>
 		</div>
 	</dialog>
 {/if}
 
-<!-- Hero Section -->
-<div class="hero-gradient relative overflow-hidden py-16">
-	<div class="hero-glow"></div>
-	<div class="relative z-10 mx-auto max-w-3xl px-4 text-center">
-		<h1 class="hero-title text-3xl font-bold tracking-tight sm:text-4xl">CommitRank</h1>
-		<p class="mt-3 font-mono text-muted-foreground">GitHub Commit Leaderboard</p>
-	</div>
-</div>
-
-<div class="mx-auto max-w-3xl px-4 py-6">
-	<!-- Header with stats -->
-	<div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-		<div>
-			<h2 class="text-lg font-semibold">Leaderboard</h2>
-			{#if data.stats}
-				<div class="mt-1 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-					<span class="flex items-center gap-1">
-						<Users class="h-3 w-3" />
-						{formatNumber(data.stats.total_users)}
-					</span>
-					<span class="flex items-center gap-1" title="Contributions for {todayUtc} (UTC date)">
-						<GitCommitHorizontal class="h-3 w-3" />
-						{formatNumber(data.stats.total_contributions_today)} today
-					</span>
+<div class="px-3 py-4">
+	<!-- Command bar: what this is, how to slice it, how to find someone -->
+	<div class="flex flex-col gap-3 pb-3 lg:flex-row lg:items-end lg:justify-between">
+		<div class="flex flex-col gap-1.5">
+			<h1 class="term-label">GitHub Commit Leaderboard</h1>
+			<nav aria-label="Contribution period" class="flex items-center">
+				<span aria-hidden="true" class="pr-2 text-subtle-foreground">period</span>
+				<ul class="flex items-center gap-1">
+					{#each periods as period (period.value)}
+						<li>
+							<a
+								href={getPeriodHref(period.value)}
+								aria-current={data.period === period.value ? 'page' : undefined}
+								class="term-transition inline-flex h-7 items-center border px-2 text-sm {data.period ===
+								period.value
+									? 'border-primary bg-primary/10 text-primary'
+									: 'border-border-control text-muted-foreground hover:border-primary hover:text-primary'}"
+							>
+								{period.label}
+							</a>
+						</li>
+					{/each}
+				</ul>
+				{#if isLoading}
 					<span
-						class="flex items-center gap-1"
-						title="Last synced: {formatUTCTime(data.stats.last_sync)}"
+						class="pl-2 text-primary"
+						role="status"
+						aria-label="Loading leaderboard"
+						aria-live="polite">{SPINNER_FRAMES[spinnerFrame]}</span
 					>
-						<Clock class="h-3 w-3" />
-						{formatRelativeTime(data.stats.last_sync)}
-					</span>
-					<span
-						class="flex items-center gap-1"
-						title="Next sync: {formatUTCTime(data.stats.next_sync)}"
-					>
-						<RefreshCw class="h-3 w-3" />
-						{formatTimeUntil(data.stats.next_sync)}
-					</span>
-				</div>
-				<div class="mt-1 space-y-0.5 text-xs text-muted-foreground/70">
-					<p
-						class="font-mono text-muted-foreground/80"
-						aria-label="Current UTC time"
-						title="Current UTC time (updates every second)"
-					>
-						UTC now: {utcNowLabel}
-					</p>
-					<p>Today resets at 00:00 UTC. Sync runs hourly.</p>
-				</div>
-			{/if}
+				{/if}
+			</nav>
 		</div>
 
-		<!-- Period Tabs -->
-		<div
-			class="flex rounded-md border border-border bg-muted/30 p-0.5"
-			role="tablist"
-			aria-label="Contribution period"
-		>
-			{#each periods as period (period.value)}
-				<a
-					href={getPeriodHref(period.value)}
-					role="tab"
-					aria-selected={data.period === period.value}
-					aria-label={period.label === '7d'
-						? '7 Days'
-						: period.label === '30d'
-							? '30 Days'
-							: period.label}
-					class="rounded px-3 py-1 text-sm font-medium transition-colors {data.period ===
-					period.value
-						? 'bg-card text-foreground shadow-sm'
-						: 'text-muted-foreground hover:text-foreground'}"
-				>
-					{period.label}
-				</a>
-			{/each}
-		</div>
+		{#if data.leaderboard.leaderboard.length > 0}
+			<div class="flex items-center gap-2">
+				<label for="row-filter" class="term-label shrink-0">filter</label>
+				<div class="relative flex w-full items-center lg:w-72">
+					<span aria-hidden="true" class="pointer-events-none absolute left-2 text-primary">/</span>
+					<input
+						bind:this={filterInput}
+						bind:value={filter}
+						id="row-filter"
+						type="text"
+						autocomplete="off"
+						spellcheck="false"
+						placeholder="narrow this page"
+						class="term-transition h-7 w-full rounded-md border border-input bg-surface-sunken py-1 pr-8 pl-6 text-sm text-foreground placeholder:text-subtle-foreground focus-visible:border-primary"
+					/>
+					<span class="pointer-events-none absolute right-1.5"><Kbd key="/" /></span>
+				</div>
+				<!-- Filtering changes the table silently for a screen-reader user, so
+				     the new row count has to be announced. -->
+				<span class="sr-only" role="status" aria-live="polite">
+					{filter.trim()
+						? `${rows.length} of ${data.leaderboard.leaderboard.length} rows match ${filter.trim()}`
+						: ''}
+				</span>
+			</div>
+		{/if}
 	</div>
 
-	<!-- Leaderboard Table -->
+	<!-- Leaderboard -->
 	<div
-		class="relative overflow-hidden rounded-md border border-border transition-opacity duration-100 {isLoading
-			? 'opacity-70'
-			: ''}"
+		class="term-transition border border-border {isLoading ? 'opacity-60' : ''}"
 		aria-busy={isLoading}
 	>
-		{#if isLoading}
-			<div class="absolute inset-x-0 top-0 z-10 h-0.5 animate-pulse bg-primary"></div>
-		{/if}
-		<table class="w-full">
+		<table class="w-full table-fixed border-collapse text-sm">
 			<thead>
-				<tr class="border-b border-border bg-muted/30 text-sm text-muted-foreground">
-					<th class="w-12 py-2 text-center font-medium">#</th>
-					<th class="py-2 pl-2 text-left font-medium">Developer</th>
-					<th class="hidden w-32 py-2 text-right font-medium sm:table-cell">Twitter/X</th>
-					<th class="w-24 py-2 pr-4 text-right font-medium">Commits</th>
+				<tr class="border-b border-border bg-card">
+					<th scope="col" class="term-label w-[6%] py-1.5 pr-4 text-right">Rank</th>
+					<th scope="col" class="term-label w-[46%] py-1.5 pl-1 text-left">Developer</th>
+					<th scope="col" class="term-label hidden w-[26%] py-1.5 text-left md:table-cell"
+						>Twitter</th
+					>
+					<th scope="col" class="term-label w-[22%] py-1.5 pr-3 text-right">Contributions</th>
 				</tr>
 			</thead>
-			<tbody class="divide-y divide-border">
+			<tbody>
 				{#if data.leaderboard.leaderboard.length === 0}
 					<tr>
-						<td colspan={4} class="py-12 text-center text-muted-foreground">
-							No developers yet.
-							<a href={resolve('/join')} class="text-primary hover:underline">Be the first</a>
+						<td colspan={4} class="px-3 py-10 text-center">
+							<p class="text-muted-foreground">
+								<span aria-hidden="true" class="text-primary">&gt;</span>
+								<span>No developers on the leaderboard yet</span>
+							</p>
+							<p class="mt-1 text-subtle-foreground">
+								Run <a
+									href={resolve('/join')}
+									class="term-transition border-b border-primary/40 text-primary hover:border-primary"
+									>join</a
+								> to be the first.
+							</p>
+						</td>
+					</tr>
+				{:else if rows.length === 0}
+					<tr>
+						<td colspan={4} class="px-3 py-10 text-center">
+							<p class="text-muted-foreground">
+								<span aria-hidden="true" class="text-primary">&gt;</span> No rows on this page match
+								<span class="text-foreground">{filter}</span>
+							</p>
+							<p class="mt-1 text-subtle-foreground">
+								Press <Kbd key="⌘K" /> to search every developer.
+							</p>
 						</td>
 					</tr>
 				{:else}
-					{#each data.leaderboard.leaderboard as entry (entry.github_username)}
-						<tr class="table-row-hover">
-							<td class="py-2.5 text-center">
-								{#if entry.rank === 1}
-									<span class="rank-badge rank-badge-gold">1</span>
-								{:else if entry.rank === 2}
-									<span class="rank-badge rank-badge-silver">2</span>
-								{:else if entry.rank === 3}
-									<span class="rank-badge rank-badge-bronze">3</span>
-								{:else}
-									<span class="text-sm text-muted-foreground">{entry.rank}</span>
-								{/if}
+					{#each rows as entry (entry.github_username)}
+						<tr class="term-transition border-b border-border/60 last:border-0 hover:bg-accent">
+							<td class="py-1.5 pr-4 text-right align-middle">
+								<span class="flex items-center justify-end gap-1">
+									<span
+										aria-hidden="true"
+										class="text-primary {entry.rank === 1 ? 'opacity-100' : 'opacity-0'}">▍</span
+									>
+									<span class="{rankTone(entry.rank)} {entry.rank <= 3 ? 'font-medium' : ''}">
+										{entry.rank}
+									</span>
+								</span>
 							</td>
-							<td class="py-2.5 pl-2">
-								<div class="flex items-center gap-2.5">
+							<td class="py-1.5 pl-1 align-middle">
+								<div class="flex items-center gap-2">
 									<Avatar
 										src={getAvatarUrl(entry.github_username, 64)}
 										srcset={getAvatarSrcset(entry.github_username)}
-										sizes="32px"
-										alt={entry.github_username}
-										initials={entry.github_username.slice(0, 2).toUpperCase()}
-										width={32}
-										height={32}
-										fallbackClass="text-[10px]"
+										sizes="24px"
+										alt=""
+										initials={entry.github_username.slice(0, 2)}
+										width={24}
+										height={24}
+										fallbackClass="text-2xs"
 									/>
-									<div class="min-w-0 flex-1">
-										<a
-											href={resolve(`/${entry.github_username}`)}
-											class="font-medium text-foreground hover:text-primary"
-										>
-											{entry.github_username}
-										</a>
-										{#if entry.display_name}
-											<p class="truncate text-sm text-muted-foreground">
-												{entry.display_name}
-											</p>
-										{/if}
-									</div>
+									<a
+										href={resolve(`/${entry.github_username}`)}
+										class="term-transition truncate {entry.rank === 1
+											? 'text-primary'
+											: 'text-foreground'} hover:text-primary hover:underline"
+									>
+										{entry.github_username}
+									</a>
+									{#if entry.display_name}
+										<span class="hidden truncate text-subtle-foreground sm:inline">
+											{entry.display_name}
+										</span>
+									{/if}
 								</div>
 							</td>
-							<td class="hidden py-2.5 text-right sm:table-cell">
+							<td class="hidden py-1.5 align-middle md:table-cell">
 								{#if entry.twitter_handle}
 									<a
 										href="https://x.com/{entry.twitter_handle}"
 										target="_blank"
 										rel="noopener noreferrer"
-										class="text-sm text-muted-foreground hover:text-primary"
+										class="term-transition truncate text-muted-foreground hover:text-primary"
 									>
 										@{entry.twitter_handle}
 									</a>
 								{:else}
-									<span class="text-sm text-muted-foreground/50">-</span>
+									<span class="text-subtle-foreground">-</span>
 								{/if}
 							</td>
-							<td class="py-2.5 pr-4 text-right">
-								<span class="contrib-count font-medium">
-									{formatNumber(entry.contributions)}
-								</span>
+							<td class="py-1.5 pr-3 align-middle">
+								<span
+									class="block text-right {entry.rank === 1 ? 'text-primary' : 'text-foreground'}"
+									>{formatNumber(entry.contributions)}</span
+								>
+								<Meter
+									value={entry.contributions}
+									max={maxContributions}
+									label="{formatNumber(entry.contributions)} contributions, {Math.round(
+										(entry.contributions / (maxContributions || 1)) * 100
+									)}% of the leader on this page"
+									class="mt-1"
+								/>
 							</td>
 						</tr>
 					{/each}
@@ -387,35 +390,30 @@
 
 	<!-- Pagination -->
 	{#if data.leaderboard.pagination.totalPages > 1}
-		<div class="mt-4 flex items-center justify-between text-sm">
-			<span class="text-muted-foreground">
+		<div class="mt-3 flex items-center justify-between text-sm">
+			<span class="text-subtle-foreground">
 				Page {data.leaderboard.pagination.page} of {data.leaderboard.pagination.totalPages}
+				<span class="hidden sm:inline"
+					>· {formatNumber(data.leaderboard.pagination.total)} ranked</span
+				>
 			</span>
-			<div class="flex gap-1">
-				{#if data.leaderboard.pagination.page > 1}
-					<a
-						href={getPageHref(data.leaderboard.pagination.page - 1)}
-						class="inline-flex h-7 items-center rounded-md px-2 text-sm hover:bg-accent hover:text-accent-foreground"
-					>
-						Prev
-					</a>
-				{:else}
-					<span class="inline-flex h-7 items-center px-2 text-sm opacity-50" aria-disabled="true"
-						>Prev</span
-					>
-				{/if}
-				{#if data.leaderboard.pagination.page < data.leaderboard.pagination.totalPages}
-					<a
-						href={getPageHref(data.leaderboard.pagination.page + 1)}
-						class="inline-flex h-7 items-center rounded-md px-2 text-sm hover:bg-accent hover:text-accent-foreground"
-					>
-						Next
-					</a>
-				{:else}
-					<span class="inline-flex h-7 items-center px-2 text-sm opacity-50" aria-disabled="true"
-						>Next</span
-					>
-				{/if}
+			<div class="flex gap-2">
+				<Button
+					variant="outline"
+					size="sm"
+					href={getPageHref(data.leaderboard.pagination.page - 1)}
+					disabled={data.leaderboard.pagination.page <= 1}
+				>
+					Previous
+				</Button>
+				<Button
+					variant="outline"
+					size="sm"
+					href={getPageHref(data.leaderboard.pagination.page + 1)}
+					disabled={data.leaderboard.pagination.page >= data.leaderboard.pagination.totalPages}
+				>
+					Next
+				</Button>
 			</div>
 		</div>
 	{/if}

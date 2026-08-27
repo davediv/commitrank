@@ -7,7 +7,10 @@
 	type Props = WithElementRef<
 		Omit<HTMLInputAttributes, 'type'> &
 			({ type: 'file'; files?: FileList } | { type?: InputType; files?: undefined })
-	>;
+	> & {
+		/** Prompt glyph rendered before the value, e.g. `>` or `$`. */
+		prompt?: string;
+	};
 
 	let {
 		ref = $bindable(null),
@@ -15,30 +18,50 @@
 		type,
 		files = $bindable(),
 		class: className,
+		prompt,
 		'data-slot': dataSlot = 'input',
 		...restProps
 	}: Props = $props();
+
+	/*
+	 * The spec asks for a border on focus only, but an unbordered field is
+	 * identified purely by its fill — #08080A against #0C0C0D is 1.06:1, well
+	 * under WCAG 1.4.11's 3:1 for control boundaries. So the box is always
+	 * drawn, in --border-control (3.24:1), and focus turns it phosphor.
+	 */
+	const FIELD =
+		'h-8 w-full min-w-0 rounded-md border border-input bg-surface-sunken text-sm text-foreground term-transition selection:bg-primary selection:text-primary-foreground placeholder:text-subtle-foreground focus-visible:border-primary disabled:cursor-not-allowed disabled:border-border disabled:text-disabled aria-invalid:border-destructive';
 </script>
 
-{#if type === 'file'}
-	<input
-		bind:this={ref}
-		data-slot={dataSlot}
-		class="flex h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 pt-1.5 text-sm font-medium shadow-xs ring-offset-background transition-[color,box-shadow] outline-none selection:bg-primary selection:text-primary-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:bg-input/30 dark:aria-invalid:ring-destructive/40 {className ||
-			''}"
-		type="file"
-		bind:files
-		bind:value
-		{...restProps}
-	/>
-{:else}
-	<input
-		bind:this={ref}
-		data-slot={dataSlot}
-		class="flex h-9 w-full min-w-0 rounded-md border border-input bg-background px-3 py-1 text-base shadow-xs ring-offset-background transition-[color,box-shadow] outline-none selection:bg-primary selection:text-primary-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30 dark:aria-invalid:ring-destructive/40 {className ||
-			''}"
-		{type}
-		bind:value
-		{...restProps}
-	/>
-{/if}
+<div class="relative flex w-full items-center {className || ''}">
+	{#if prompt}
+		<span
+			aria-hidden="true"
+			class="pointer-events-none absolute left-2 text-sm leading-none text-primary select-none"
+		>
+			{prompt}
+		</span>
+	{/if}
+	{#if type === 'file'}
+		<input
+			bind:this={ref}
+			data-slot={dataSlot}
+			class="{FIELD} py-1 pr-2 {prompt
+				? 'pl-6'
+				: 'pl-2'} file:mr-2 file:border-0 file:bg-transparent file:text-sm file:text-primary"
+			type="file"
+			bind:files
+			bind:value
+			{...restProps}
+		/>
+	{:else}
+		<input
+			bind:this={ref}
+			data-slot={dataSlot}
+			class="{FIELD} py-1 pr-2 {prompt ? 'pl-6' : 'pl-2'}"
+			{type}
+			bind:value
+			{...restProps}
+		/>
+	{/if}
+</div>

@@ -111,10 +111,12 @@ describe('/+page.svelte - Leaderboard Page', () => {
 			await expect.element(heading).toHaveTextContent('GitHub Commit Leaderboard');
 		});
 
-		it('should render the subheading', async () => {
+		it('should render the period navigation', async () => {
 			render(Page, { props: { data: mockLeaderboardData } });
 
-			await expect.element(page.getByText("See who's shipping the most code")).toBeInTheDocument();
+			await expect
+				.element(page.getByRole('navigation', { name: 'Contribution period' }))
+				.toBeInTheDocument();
 		});
 
 		it('should display trophy icon', async () => {
@@ -126,69 +128,37 @@ describe('/+page.svelte - Leaderboard Page', () => {
 		});
 	});
 
-	describe('Stats Summary', () => {
-		it('should display user count when stats are available', async () => {
+	// The sync clock and stats readouts now live in the persistent status bar;
+	// their assertions moved to src/lib/components/status-bar.svelte.spec.ts.
+
+	describe('Time Period Navigation', () => {
+		// These navigate to ?period=, so they are links with aria-current, not
+		// ARIA tabs — tabs control in-page panels and announce wrongly here.
+		it('should render all four period links', async () => {
 			render(Page, { props: { data: mockLeaderboardData } });
 
-			await expect.element(page.getByText('100 developers')).toBeInTheDocument();
+			await expect.element(page.getByRole('link', { name: 'Today' })).toBeInTheDocument();
+			await expect.element(page.getByRole('link', { name: '7 Days' })).toBeInTheDocument();
+			await expect.element(page.getByRole('link', { name: '30 Days' })).toBeInTheDocument();
+			await expect.element(page.getByRole('link', { name: 'Year' })).toBeInTheDocument();
 		});
 
-		it('should display today contributions when stats are available', async () => {
+		it('should mark the current period as the current page', async () => {
 			render(Page, { props: { data: mockLeaderboardData } });
 
-			await expect.element(page.getByText('5,000 contributions today')).toBeInTheDocument();
+			const todayLink = page.getByRole('link', { name: 'Today' });
+			await expect.element(todayLink).toHaveAttribute('aria-current', 'page');
 		});
 
-		it('should display UTC now label when stats are available', async () => {
-			render(Page, { props: { data: mockLeaderboardData } });
-
-			await expect.element(page.getByText(/UTC now:/)).toBeInTheDocument();
-		});
-
-		it('should display UTC reset hint text', async () => {
-			render(Page, { props: { data: mockLeaderboardData } });
-
-			await expect.element(page.getByText('Today resets at 00:00 UTC.')).toBeInTheDocument();
-		});
-
-		it('should display hourly sync cadence text', async () => {
-			render(Page, { props: { data: mockLeaderboardData } });
-
-			await expect.element(page.getByText('Sync runs hourly.')).toBeInTheDocument();
-		});
-
-		it('should not display stats when not available', async () => {
-			render(Page, { props: { data: mockEmptyData } });
-
-			// Stats should not be visible
-			const developersText = page.getByText(/\d+ developers/);
-			await expect.element(developersText).not.toBeInTheDocument();
-		});
-	});
-
-	describe('Time Period Tabs', () => {
-		it('should render all four period tabs', async () => {
-			render(Page, { props: { data: mockLeaderboardData } });
-
-			await expect.element(page.getByRole('tab', { name: 'Today' })).toBeInTheDocument();
-			await expect.element(page.getByRole('tab', { name: '7 Days' })).toBeInTheDocument();
-			await expect.element(page.getByRole('tab', { name: '30 Days' })).toBeInTheDocument();
-			await expect.element(page.getByRole('tab', { name: 'Year' })).toBeInTheDocument();
-		});
-
-		it('should have the current period tab selected', async () => {
-			render(Page, { props: { data: mockLeaderboardData } });
-
-			const todayTab = page.getByRole('tab', { name: 'Today' });
-			await expect.element(todayTab).toHaveAttribute('aria-selected', 'true');
-		});
-
-		it('should show 7days period as selected when period is 7days', async () => {
+		it('should show 7days period as current when period is 7days', async () => {
 			const data7days = { ...mockLeaderboardData, period: '7days' as const };
 			render(Page, { props: { data: data7days } });
 
-			const sevenDaysTab = page.getByRole('tab', { name: '7 Days' });
-			await expect.element(sevenDaysTab).toHaveAttribute('aria-selected', 'true');
+			const sevenDaysLink = page.getByRole('link', { name: '7 Days' });
+			await expect.element(sevenDaysLink).toHaveAttribute('aria-current', 'page');
+			await expect
+				.element(page.getByRole('link', { name: 'Today' }))
+				.not.toHaveAttribute('aria-current', 'page');
 		});
 	});
 
@@ -199,7 +169,7 @@ describe('/+page.svelte - Leaderboard Page', () => {
 			// Check for table existence via exact text matches for headers
 			await expect.element(page.getByText('Rank', { exact: true })).toBeInTheDocument();
 			await expect
-				.element(page.getByRole('cell', { name: 'Developer', exact: true }))
+				.element(page.getByRole('columnheader', { name: 'Developer', exact: true }))
 				.toBeInTheDocument();
 			await expect.element(page.getByText('Contributions', { exact: true })).toBeInTheDocument();
 			await expect.element(page.getByText('Twitter', { exact: true })).toBeInTheDocument();
@@ -231,15 +201,20 @@ describe('/+page.svelte - Leaderboard Page', () => {
 			await expect.element(page.getByText('1,000')).toBeInTheDocument();
 		});
 
-		it('should display medal emojis for top 3 ranks', async () => {
+		it('should render every rank number in the gutter', async () => {
 			render(Page, { props: { data: mockLeaderboardData } });
 
-			// Gold medal for rank 1
-			await expect.element(page.getByText('🥇')).toBeInTheDocument();
-			// Silver medal for rank 2
-			await expect.element(page.getByText('🥈')).toBeInTheDocument();
-			// Bronze medal for rank 3
-			await expect.element(page.getByText('🥉')).toBeInTheDocument();
+			for (const rank of ['1', '2', '3', '4']) {
+				await expect.element(page.getByText(rank, { exact: true }).first()).toBeInTheDocument();
+			}
+		});
+
+		it('should show a meter for each entry describing its share of the leader', async () => {
+			render(Page, { props: { data: mockLeaderboardData } });
+
+			const meters = page.getByRole('meter');
+			await expect.element(meters.first()).toHaveAttribute('aria-valuenow', '1500');
+			await expect.element(meters.first()).toHaveAttribute('aria-valuemax', '1500');
 		});
 
 		it('should display display names when available', async () => {
@@ -264,12 +239,14 @@ describe('/+page.svelte - Leaderboard Page', () => {
 			await expect.element(dashes).toBeInTheDocument();
 		});
 
-		it('should display github profile links', async () => {
+		it("should link each row to that developer's CommitRank profile", async () => {
 			render(Page, { props: { data: mockLeaderboardData } });
 
-			// Use exact match to avoid matching twitter link
+			// The row links to /<username> on CommitRank, not out to github.com —
+			// github.com is linked from the profile page itself. This assertion
+			// previously expected the GitHub URL and had never matched the markup.
 			const topdevLink = page.getByRole('link', { name: 'topdev', exact: true });
-			await expect.element(topdevLink).toHaveAttribute('href', 'https://github.com/topdev');
+			await expect.element(topdevLink).toHaveAttribute('href', '/topdev');
 		});
 	});
 
@@ -294,15 +271,15 @@ describe('/+page.svelte - Leaderboard Page', () => {
 		it('should not display pagination when only one page', async () => {
 			render(Page, { props: { data: mockLeaderboardData } });
 
-			const prevButton = page.getByRole('button', { name: 'Previous' });
-			await expect.element(prevButton).not.toBeInTheDocument();
+			const prevLink = page.getByRole('link', { name: 'Previous' });
+			await expect.element(prevLink).not.toBeInTheDocument();
 		});
 
 		it('should display pagination controls when multiple pages', async () => {
 			render(Page, { props: { data: mockPaginatedData } });
 
-			await expect.element(page.getByRole('button', { name: 'Previous' })).toBeInTheDocument();
-			await expect.element(page.getByRole('button', { name: 'Next' })).toBeInTheDocument();
+			await expect.element(page.getByRole('link', { name: 'Previous' })).toBeInTheDocument();
+			await expect.element(page.getByRole('link', { name: 'Next' })).toBeInTheDocument();
 		});
 
 		it('should display current page info', async () => {
@@ -311,27 +288,31 @@ describe('/+page.svelte - Leaderboard Page', () => {
 			await expect.element(page.getByText('Page 2 of 3')).toBeInTheDocument();
 		});
 
-		it('should display total developer count', async () => {
+		it('should display the total ranked count', async () => {
 			render(Page, { props: { data: mockPaginatedData } });
 
-			await expect.element(page.getByText(/50 developers/)).toBeInTheDocument();
+			// "ranked" not "developers": pagination.total counts users ranked in
+			// this period, while the status bar's USERS counts every registration.
+			await expect.element(page.getByText(/50 ranked/)).toBeInTheDocument();
 		});
 
-		it('should enable Previous button when not on first page', async () => {
+		it('should enable Previous when not on first page', async () => {
 			render(Page, { props: { data: mockPaginatedData } });
 
-			const prevButton = page.getByRole('button', { name: 'Previous' });
-			await expect.element(prevButton).not.toBeDisabled();
+			const prevLink = page.getByRole('link', { name: 'Previous' });
+			await expect.element(prevLink).toHaveAttribute('href', '/?period=today&page=1');
+			await expect.element(prevLink).not.toHaveAttribute('aria-disabled', 'true');
 		});
 
-		it('should enable Next button when not on last page', async () => {
+		it('should enable Next when not on last page', async () => {
 			render(Page, { props: { data: mockPaginatedData } });
 
-			const nextButton = page.getByRole('button', { name: 'Next' });
-			await expect.element(nextButton).not.toBeDisabled();
+			const nextLink = page.getByRole('link', { name: 'Next' });
+			await expect.element(nextLink).toHaveAttribute('href', '/?period=today&page=3');
+			await expect.element(nextLink).not.toHaveAttribute('aria-disabled', 'true');
 		});
 
-		it('should disable Next button on last page', async () => {
+		it('should disable Next on last page', async () => {
 			const lastPageData: PageData = {
 				...mockPaginatedData,
 				leaderboard: {
@@ -346,11 +327,12 @@ describe('/+page.svelte - Leaderboard Page', () => {
 			};
 			render(Page, { props: { data: lastPageData } });
 
-			const nextButton = page.getByRole('button', { name: 'Next' });
-			await expect.element(nextButton).toBeDisabled();
+			const nextLink = page.getByRole('link', { name: 'Next' });
+			await expect.element(nextLink).toHaveAttribute('aria-disabled', 'true');
+			await expect.element(nextLink).not.toHaveAttribute('href');
 		});
 
-		it('should disable Previous button on first page', async () => {
+		it('should disable Previous on first page', async () => {
 			const firstPageWithPagination: PageData = {
 				...mockPaginatedData,
 				leaderboard: {
@@ -365,8 +347,9 @@ describe('/+page.svelte - Leaderboard Page', () => {
 			};
 			render(Page, { props: { data: firstPageWithPagination } });
 
-			const prevButton = page.getByRole('button', { name: 'Previous' });
-			await expect.element(prevButton).toBeDisabled();
+			const prevLink = page.getByRole('link', { name: 'Previous' });
+			await expect.element(prevLink).toHaveAttribute('aria-disabled', 'true');
+			await expect.element(prevLink).not.toHaveAttribute('href');
 		});
 	});
 

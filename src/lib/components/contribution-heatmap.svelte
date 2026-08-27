@@ -7,8 +7,8 @@
 
 	let { contributions }: Props = $props();
 
-	const CELL_SIZE = 11;
-	const CELL_GAP = 2;
+	const CELL_SIZE = 12;
+	const CELL_GAP = 3;
 	const CELL_STEP = CELL_SIZE + CELL_GAP;
 	const LABEL_WIDTH = 28;
 	const HEADER_HEIGHT = 16;
@@ -30,13 +30,15 @@
 		'Dec'
 	];
 
-	// Color levels for dark theme (oklch green scale)
+	// Phosphor ramp, read from the token layer so the heatmap follows the theme
+	// instead of hard-coding a second palette. Adjacent steps are separated by
+	// at least 1.5:1 so a level is legible without opening the tooltip.
 	const COLORS = [
-		'oklch(0.22 0.015 250)', // 0: empty
-		'oklch(0.30 0.08 145)', // 1: low
-		'oklch(0.38 0.12 145)', // 2: medium-low
-		'oklch(0.46 0.15 145)', // 3: medium
-		'oklch(0.55 0.18 145)' // 4: high (matches --success)
+		'var(--term-heat-0)',
+		'var(--term-heat-1)',
+		'var(--term-heat-2)',
+		'var(--term-heat-3)',
+		'var(--term-heat-4)'
 	];
 
 	interface CellData {
@@ -190,8 +192,10 @@
 
 <div class="relative overflow-x-auto" onpointerleave={() => (hoveredCell = null)}>
 	<svg
-		width={heatmapData.svgWidth}
-		height={heatmapData.svgHeight}
+		viewBox="0 0 {heatmapData.svgWidth} {heatmapData.svgHeight}"
+		width="100%"
+		style="min-width: {heatmapData.svgWidth}px"
+		preserveAspectRatio="xMidYMid meet"
 		class="block"
 		role="img"
 		aria-label="Contribution heatmap for the past year"
@@ -200,7 +204,7 @@
 		<title>Contribution heatmap for the past year</title>
 		<!-- Month labels -->
 		{#each heatmapData.monthLabels as { label, x } (x)}
-			<text {x} y={10} class="fill-muted-foreground text-[10px]">{label}</text>
+			<text {x} y={10} class="fill-subtle-foreground text-2xs">{label}</text>
 		{/each}
 
 		<!-- Day labels -->
@@ -209,7 +213,7 @@
 				<text
 					x={0}
 					y={HEADER_HEIGHT + i * CELL_STEP + CELL_SIZE - 1}
-					class="fill-muted-foreground text-[10px]"
+					class="fill-subtle-foreground text-2xs"
 				>
 					{label}
 				</text>
@@ -234,7 +238,7 @@
 
 	{#if hoveredCell}
 		<div
-			class="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-[calc(100%+6px)] rounded border border-border bg-card px-2 py-1 text-[10px] whitespace-nowrap text-foreground shadow-lg"
+			class="term-tooltip pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-[calc(100%+6px)] border border-border-control bg-popover px-2 py-1 text-2xs whitespace-nowrap text-foreground"
 			style="left: {tooltipX}px; top: {tooltipY}px"
 		>
 			{hoveredCell.count} contribution{hoveredCell.count !== 1 ? 's' : ''} on {formatDate(
@@ -245,10 +249,11 @@
 </div>
 
 <!-- Legend -->
-<div class="mt-2 flex items-center justify-end gap-1 text-[10px] text-muted-foreground">
-	<span>Less</span>
+<div class="mt-2 flex items-center justify-end gap-1 text-2xs text-subtle-foreground">
+	<span>less</span>
 	{#each COLORS as color (color)}
-		<span class="inline-block h-[10px] w-[10px] rounded-sm" style="background: {color}"></span>
+		<span aria-hidden="true" class="inline-block h-[10px] w-[10px]" style="background: {color}"
+		></span>
 	{/each}
-	<span>More</span>
+	<span>more</span>
 </div>

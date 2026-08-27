@@ -34,13 +34,18 @@
 	}
 </script>
 
+<!--
+	Squared to --radius, not a circle: this style renders boxes, and a round
+	avatar in a character-grid row is the one shape that gives it away.
+	The initials sit behind the image so a failed load reveals them.
+-->
 <span
-	class="relative flex shrink-0 overflow-hidden rounded-full bg-muted {className}"
+	class="relative flex shrink-0 overflow-hidden rounded-md border border-border bg-surface-sunken {className}"
 	style="width: {width}px; height: {height}px"
 >
 	<span
 		aria-hidden="true"
-		class="absolute inset-0 flex items-center justify-center rounded-full bg-muted {fallbackClass}"
+		class="absolute inset-0 flex items-center justify-center text-subtle-foreground uppercase {fallbackClass}"
 	>
 		{initials}
 	</span>
