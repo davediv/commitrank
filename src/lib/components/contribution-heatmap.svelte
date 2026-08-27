@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { ContributionDayData } from '$lib/types';
+	import { buildHeatmapGrid, DAYS_IN_WEEK, HEATMAP_LEVELS, type HeatmapCell } from '$lib/heatmap';
 
 	interface Props {
 		contributions: ContributionDayData[];
@@ -12,44 +13,15 @@
 	const CELL_STEP = CELL_SIZE + CELL_GAP;
 	const LABEL_WIDTH = 28;
 	const HEADER_HEIGHT = 16;
-	const DAYS_IN_WEEK = 7;
 
 	const DAY_LABELS = ['', 'Mon', '', 'Wed', '', 'Fri', ''];
-	const MONTH_NAMES = [
-		'Jan',
-		'Feb',
-		'Mar',
-		'Apr',
-		'May',
-		'Jun',
-		'Jul',
-		'Aug',
-		'Sep',
-		'Oct',
-		'Nov',
-		'Dec'
-	];
 
 	// Phosphor ramp, read from the token layer so the heatmap follows the theme
 	// instead of hard-coding a second palette. Adjacent steps are separated by
 	// at least 1.5:1 so a level is legible without opening the tooltip.
-	const COLORS = [
-		'var(--term-heat-0)',
-		'var(--term-heat-1)',
-		'var(--term-heat-2)',
-		'var(--term-heat-3)',
-		'var(--term-heat-4)'
-	];
+	const COLORS = Array.from({ length: HEATMAP_LEVELS }, (_, i) => `var(--term-heat-${i})`);
 
-	interface CellData {
-		date: string;
-		count: number;
-		col: number;
-		row: number;
-		level: number;
-	}
-
-	let hoveredCell: CellData | null = $state(null);
+	let hoveredCell: HeatmapCell | null = $state(null);
 	let tooltipX = $state(0);
 	let tooltipY = $state(0);
 	const dateFormatter = new Intl.DateTimeFormat('en-US', {
@@ -59,103 +31,36 @@
 	});
 
 	/**
-	 * Build the heatmap grid data from contribution data.
-	 * Extracted as a plain function to avoid ESLint svelte/prefer-svelte-reactivity
-	 * warnings for Map/Date inside $derived.
+	 * Lay the shared grid out in SVG coordinates.
+	 *
+	 * Kept a plain function rather than inline `$derived` work so ESLint's
+	 * svelte/prefer-svelte-reactivity rule does not flag the Date/Map use inside.
 	 */
-	function buildHeatmapData(contribs: ContributionDayData[]) {
-		// Build lookup object
-		const countMap: Record<string, number> = {};
-		for (const c of contribs) {
-			countMap[c.date] = c.count;
-		}
+	function layoutHeatmap(contribs: ContributionDayData[]) {
+		const grid = buildHeatmapGrid(contribs);
 
-		// Use UTC to avoid DST issues
-		const today = new Date();
-		const todayUtc = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
-		const todayDay = new Date(todayUtc).getUTCDay(); // 0=Sunday
-
-		// Start date: 52 weeks before the start of the current week
-		const startMs = todayUtc - (todayDay + 52 * 7) * 86400000;
-		const endMs = todayUtc;
-
-		// Compute thresholds based on non-zero values
-		const nonZero = contribs.filter((c) => c.count > 0).map((c) => c.count);
-		nonZero.sort((a, b) => a - b);
-
-		let thresholds: number[];
-		if (nonZero.length === 0) {
-			thresholds = [1, 2, 3, 4];
-		} else {
-			const q1 = nonZero[Math.floor(nonZero.length * 0.25)] || 1;
-			const q2 = nonZero[Math.floor(nonZero.length * 0.5)] || q1 + 1;
-			const q3 = nonZero[Math.floor(nonZero.length * 0.75)] || q2 + 1;
-			thresholds = [1, q1 + 1, q2 + 1, q3 + 1];
-		}
-
-		function getLevel(count: number): number {
-			if (count === 0) return 0;
-			if (count < thresholds[1]) return 1;
-			if (count < thresholds[2]) return 2;
-			if (count < thresholds[3]) return 3;
-			return 4;
-		}
-
-		// Generate cells
-		const cells: CellData[] = [];
-		const monthLabels: { label: string; x: number }[] = [];
-		let lastMonth = -1;
-
-		const totalDays = Math.ceil((endMs - startMs) / 86400000) + 1;
-		const numWeeks = Math.ceil(totalDays / 7);
-		let currentMs = startMs;
-
-		for (let d = 0; d < totalDays; d++) {
-			const current = new Date(currentMs);
-			const dateStr = current.toISOString().split('T')[0];
-			const dayOfWeek = current.getUTCDay();
-			const col = Math.floor(d / 7);
-			const row = dayOfWeek;
-			const count = countMap[dateStr] || 0;
-
-			// Track month labels
-			const month = current.getUTCMonth();
-			if (month !== lastMonth && row === 0) {
-				monthLabels.push({
-					label: MONTH_NAMES[month],
-					x: LABEL_WIDTH + col * CELL_STEP
-				});
-				lastMonth = month;
-			}
-
-			cells.push({
-				date: dateStr,
-				count,
-				col,
-				row,
-				level: getLevel(count)
-			});
-
-			currentMs += 86400000;
-		}
-
-		const svgWidth = LABEL_WIDTH + numWeeks * CELL_STEP;
+		const svgWidth = LABEL_WIDTH + grid.weeks * CELL_STEP;
 		const svgHeight = HEADER_HEIGHT + DAYS_IN_WEEK * CELL_STEP;
 		const paths = COLORS.map((color) => ({ color, d: '' }));
 
 		// Hundreds of individual <rect><title> pairs made profile hydration and
 		// layout disproportionately expensive. Grouping equal-color squares into
 		// five SVG paths preserves the visual while cutting ~740 DOM nodes.
-		for (const cell of cells) {
+		for (const cell of grid.cells) {
 			const x = LABEL_WIDTH + cell.col * CELL_STEP;
 			const y = HEADER_HEIGHT + cell.row * CELL_STEP;
 			paths[cell.level].d += `M${x} ${y}h${CELL_SIZE}v${CELL_SIZE}h-${CELL_SIZE}Z`;
 		}
 
-		return { cells, monthLabels, paths, svgWidth, svgHeight };
+		const monthLabels = grid.months.map(({ label, col }) => ({
+			label,
+			x: LABEL_WIDTH + col * CELL_STEP
+		}));
+
+		return { cells: grid.cells, monthLabels, paths, svgWidth, svgHeight };
 	}
 
-	const heatmapData = $derived.by(() => buildHeatmapData(contributions));
+	const heatmapData = $derived.by(() => layoutHeatmap(contributions));
 
 	function formatDate(dateStr: string): string {
 		return dateFormatter.format(new Date(dateStr + 'T00:00:00'));
