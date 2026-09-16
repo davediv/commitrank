@@ -98,12 +98,21 @@ export function renderCardSvg({ avatarDataUri = null, ...data }: CardSvgOptions)
 				break;
 			}
 			case 'scanlines': {
-				// One tiled pattern rather than 360 rects: same 3% texture as
-				// `.term-scanlines`, a fraction of the document size.
+				/*
+				 * The canvas renderer draws real 1px scanlines; resvg cannot afford
+				 * to. It has no fast path for a <pattern> fill — it pays a separate
+				 * render pass and a full-canvas composite whatever the tile
+				 * geometry, measured at 46ms of the card's 77ms, most of the
+				 * endpoint's entire CPU cost.
+				 *
+				 * Nothing is lost by averaging them. The PNG is rasterized at
+				 * CARD_RASTER_SIZE against this 1080-unit viewBox, so a 1-unit line
+				 * lands on well under a pixel and is resolved into a flat tint by
+				 * the downscale regardless. One rect at that averaged opacity —
+				 * one lit row in three, at 3% — is the same picture.
+				 */
 				parts.push(
-					`<defs><pattern id="scan" width="1" height="3" patternUnits="userSpaceOnUse">` +
-						`<rect width="1" height="1" fill="#ffffff" fill-opacity="0.03"/></pattern></defs>` +
-						`<rect width="${CARD_SIZE}" height="${CARD_SIZE}" fill="url(#scan)"/>`
+					`<rect width="${CARD_SIZE}" height="${CARD_SIZE}" fill="#ffffff" fill-opacity="0.01"/>`
 				);
 				break;
 			}

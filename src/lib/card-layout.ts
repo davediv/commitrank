@@ -32,6 +32,19 @@ export const CARD_SIZE = 1080;
 export const CARD_SCALE = 2;
 
 /**
+ * Output pixels for the server-side `og:image` raster, against the same
+ * 1080-unit viewBox.
+ *
+ * Rasterizing scales with pixel count and this PNG is only ever a link
+ * preview — `twitter:card` is `summary`, which X renders at 144-400px, and no
+ * unfurler shows a square card larger than about 300px. 640 is already retina
+ * for every consumer, and costs a quarter of what 1080 does. The card a
+ * visitor downloads is unaffected: that one is drawn on a canvas at
+ * CARD_SIZE * CARD_SCALE by `share-card.ts` and never goes through resvg.
+ */
+export const CARD_RASTER_SIZE = 640;
+
+/**
  * Every monospace face in the stack advances 0.6em per glyph (JetBrains Mono is
  * 600/1000 units; SF Mono and Menlo match). Measuring from that constant rather
  * than from `measureText` is what lets the server lay the card out identically

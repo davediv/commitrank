@@ -10,7 +10,7 @@
  */
 
 import { initWasm, Resvg } from '@resvg/resvg-wasm';
-import { CARD_SIZE } from '$lib/card-layout';
+import { CARD_RASTER_SIZE } from '$lib/card-layout';
 import { getCardFonts } from './card-fonts';
 import { renderCardSvg, type CardSvgOptions } from './card-svg';
 
@@ -50,13 +50,12 @@ export async function renderCardPng(options: CardSvgOptions): Promise<Uint8Array
 
 	const resvg = new Resvg(renderCardSvg(options), {
 		/*
-		 * 1x, unlike the 2x canvas the browser draws for download. Rasterizing is
-		 * the entire cost of this endpoint and it scales with pixel count, so 2x
-		 * would quadruple the Worker's CPU time to produce something every social
-		 * platform immediately downscales — 1080 square is already the size they
-		 * ask for.
+		 * Well under the 1080-unit layout, and far under the 2x canvas the browser
+		 * draws for download. Rasterizing is the entire cost of this endpoint and
+		 * it scales with pixel count, so the output is sized to what actually
+		 * consumes it rather than to the layout — see CARD_RASTER_SIZE.
 		 */
-		fitTo: { mode: 'width', value: CARD_SIZE },
+		fitTo: { mode: 'width', value: CARD_RASTER_SIZE },
 		font: {
 			fontBuffers: getCardFonts(),
 			defaultFontFamily: 'JetBrains Mono',
