@@ -122,8 +122,8 @@
 	-->
 	<meta property="og:image" content={cardUrl} />
 	<meta property="og:image:type" content="image/png" />
-	<meta property="og:image:width" content="1080" />
-	<meta property="og:image:height" content="1080" />
+	<meta property="og:image:width" content="640" />
+	<meta property="og:image:height" content="640" />
 	<meta property="og:image:alt" content={cardAlt} />
 	<!-- summary, not summary_large_image: X crops the latter to 1.91:1 and would
 	     cut the top and bottom off a square card. -->
