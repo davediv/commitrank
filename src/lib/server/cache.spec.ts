@@ -47,7 +47,11 @@ describe('Cache Utilities', () => {
 		});
 
 		it('should have correct USER TTL', () => {
-			expect(CACHE_TTL.USER).toBe(86400);
+			expect(CACHE_TTL.USER).toBe(21600);
+		});
+
+		it('should have correct CARD TTL', () => {
+			expect(CACHE_TTL.CARD).toBe(86400);
 		});
 
 		it('should have correct GITHUB TTL', () => {

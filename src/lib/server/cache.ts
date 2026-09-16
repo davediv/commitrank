@@ -10,12 +10,23 @@
 export const CACHE_TTL = {
 	/** Leaderboard cache - 6 hours (invalidated on sync/join) */
 	LEADERBOARD: 21600,
-	/** Individual user/profile cache - 24 hours (invalidated on sync/join) */
-	USER: 86400,
+	/** Individual user/profile cache - 6 hours (invalidated when that user syncs) */
+	USER: 21600,
 	/** GitHub API response cache - 1 hour */
 	GITHUB: 3600,
 	/** Stats cache - 6 hours (invalidated on sync/join) */
 	STATS: 21600,
+	/**
+	 * Rendered share card - 24 hours (invalidated when that user syncs).
+	 *
+	 * Deliberately longer than USER. The profile payload behind it is one D1
+	 * round trip to rebuild; the PNG is a resvg rasterization, by far the most
+	 * expensive thing this Worker does. A card only goes wrong when its owner's
+	 * numbers change, which invalidates it directly — what a longer life risks
+	 * is a stale *rank*, and the edge already serves this PNG up to its
+	 * Cache-Control stale regardless.
+	 */
+	CARD: 86400,
 	/** Avatar cache - 7 days (refreshed on sync) */
 	AVATAR: 604800
 } as const;
@@ -145,8 +156,15 @@ export async function deleteCached(kv: KVNamespace, key: string): Promise<void> 
  * @param prefix - Key prefix to match
  */
 export async function invalidateByPrefix(kv: KVNamespace, prefix: string): Promise<void> {
-	const list = await kv.list({ prefix });
-	await Promise.all(list.keys.map((key) => kv.delete(key.name)));
+	let cursor: string | undefined;
+
+	// kv.list() pages at 1000 keys. Ignoring the cursor silently under-deleted
+	// everything past the first page.
+	do {
+		const list = await kv.list({ prefix, cursor });
+		await Promise.all(list.keys.map((key) => kv.delete(key.name)));
+		cursor = list.list_complete ? undefined : list.cursor;
+	} while (cursor);
 }
 
 /**

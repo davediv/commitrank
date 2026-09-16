@@ -2,9 +2,10 @@
  * Share card endpoint — serves the profile card as a PNG.
  *
  * This is what `og:image` points at, so it has to answer a crawler that runs no
- * JavaScript. Rendering is expensive relative to everything else in the app
- * (~150ms of rasterization), so a rendered card is cached in KV and invalidated
- * with the rest of a user's data on sync.
+ * JavaScript. Rendering is still the most expensive thing in the app by an order
+ * of magnitude (tens of ms of rasterization, against sub-millisecond page
+ * renders), so a rendered card is cached in KV under CACHE_TTL.CARD and dropped
+ * when that user next syncs.
  *
  * The `.png` in the route is deliberate: several crawlers and chat unfurlers
  * key off the extension as well as the content type.
@@ -136,7 +137,7 @@ export const GET: RequestHandler = async ({ params, platform, url }) => {
 			avatarDataUri
 		});
 
-		const write = setBinary(kv, key, toArrayBuffer(png), CACHE_TTL.USER, {
+		const write = setBinary(kv, key, toArrayBuffer(png), CACHE_TTL.CARD, {
 			contentType: 'image/png'
 		});
 		if (platform?.ctx) platform.ctx.waitUntil(write);
