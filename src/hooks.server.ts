@@ -1,6 +1,7 @@
 import type { Handle } from '@sveltejs/kit';
 
 const PAGE_CACHE_SECONDS = 60;
+const PAGE_CACHE_NAME = 'commitrank-public-pages';
 const LEADERBOARD_PERIODS = new Set(['today', '7days', '30days', 'year']);
 const PROFILE_PATH = /^\/[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,37}[a-zA-Z0-9])?$/;
 
@@ -27,20 +28,19 @@ function getAllowedOrigins(environment: string): string[] {
 /**
  * Add security headers to response
  * Note: CSP is handled by SvelteKit in svelte.config.js with proper script hashing
+ *
+ * Mutates rather than rebuilding. `resolve()` hands back a Response SvelteKit
+ * owns, whose headers are writable — this is the pattern in its own hooks
+ * documentation — and reconstructing one copies the entire header list and
+ * re-wraps the body stream to change three entries.
  */
 function addSecurityHeaders(response: Response): Response {
-	const headers = new Headers(response.headers);
-
 	// Additional security headers (CSP is set by SvelteKit)
-	headers.set('X-Content-Type-Options', 'nosniff');
-	headers.set('X-Frame-Options', 'DENY');
-	headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+	response.headers.set('X-Content-Type-Options', 'nosniff');
+	response.headers.set('X-Frame-Options', 'DENY');
+	response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
 
-	return new Response(response.body, {
-		status: response.status,
-		statusText: response.statusText,
-		headers
-	});
+	return response;
 }
 
 function isPublicPageRequest(request: Request, url: URL): boolean {
@@ -75,29 +75,6 @@ function createPageCacheKey(url: URL): Request {
 	return new Request(cacheUrl, { method: 'GET' });
 }
 
-function withPageCacheStatus(response: Response, status: 'HIT' | 'MISS'): Response {
-	const headers = new Headers(response.headers);
-	headers.set('X-Page-Cache', status);
-
-	return new Response(response.body, {
-		status: response.status,
-		statusText: response.statusText,
-		headers
-	});
-}
-
-function createCacheableResponse(response: Response): Response {
-	const headers = new Headers(response.headers);
-	headers.set('Cache-Control', `public, max-age=${PAGE_CACHE_SECONDS}`);
-	headers.delete('X-Page-Cache');
-
-	return new Response(response.body, {
-		status: response.status,
-		statusText: response.statusText,
-		headers
-	});
-}
-
 /**
  * Check if origin is allowed.
  *
@@ -127,22 +104,19 @@ function addCorsHeaders(
 	origin: string,
 	isPreflight: boolean = false
 ): Response {
-	const headers = new Headers(response.headers);
-
-	headers.set('Access-Control-Allow-Origin', origin);
-	headers.set('Access-Control-Allow-Credentials', 'true');
+	response.headers.set('Access-Control-Allow-Origin', origin);
+	response.headers.set('Access-Control-Allow-Credentials', 'true');
 
 	if (isPreflight) {
-		headers.set('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
-		headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-		headers.set('Access-Control-Max-Age', '86400'); // 24 hours
+		response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
+		response.headers.set(
+			'Access-Control-Allow-Headers',
+			'Content-Type, Authorization, X-Requested-With'
+		);
+		response.headers.set('Access-Control-Max-Age', '86400'); // 24 hours
 	}
 
-	return new Response(response.body, {
-		status: response.status,
-		statusText: response.statusText,
-		headers
-	});
+	return response;
 }
 
 export const handle: Handle = async ({ event, resolve }) => {
@@ -181,20 +155,29 @@ export const handle: Handle = async ({ event, resolve }) => {
 		return response;
 	}
 
-	// Public SSR pages are identical for every visitor. Keep the rendered HTML in
-	// each Cloudflare data center briefly so repeat visitors avoid Worker, KV, and
-	// D1 latency while preserving the leaderboard's near-real-time behavior.
-	const pageCache = platform?.caches
-		? await platform.caches.open('commitrank-public-pages')
-		: undefined;
-	const cacheableRequest = pageCache && isPublicPageRequest(request, url);
-	const pageCacheKey = cacheableRequest ? createPageCacheKey(url) : null;
+	/*
+	 * Public SSR pages are identical for every visitor. Keep the rendered HTML in
+	 * each Cloudflare data center briefly so repeat visitors avoid Worker, KV, and
+	 * D1 latency while preserving the leaderboard's near-real-time behavior.
+	 *
+	 * The cache is opened only once a request is known to be able to use it. It
+	 * used to be opened, and awaited, on every non-API request — form POSTs to
+	 * /join included — before anything asked whether the response was cacheable.
+	 */
+	const pageCacheKey =
+		platform?.caches && isPublicPageRequest(request, url) ? createPageCacheKey(url) : null;
+	const pageCache = pageCacheKey ? await platform!.caches.open(PAGE_CACHE_NAME) : undefined;
 
 	if (pageCache && pageCacheKey) {
 		try {
 			const cachedResponse = await pageCache.match(pageCacheKey);
 			if (cachedResponse) {
-				return withPageCacheStatus(cachedResponse, 'HIT');
+				// Re-wrapped rather than mutated: a Cache API response's headers are
+				// not guaranteed writable. This only re-points the body stream, so
+				// unlike clone() it does not tee it.
+				const hit = new Response(cachedResponse.body, cachedResponse);
+				hit.headers.set('X-Page-Cache', 'HIT');
+				return hit;
 			}
 		} catch (error) {
 			console.error(
@@ -216,8 +199,15 @@ export const handle: Handle = async ({ event, resolve }) => {
 		response.headers.get('Content-Type')?.includes('text/html') &&
 		!response.headers.has('Set-Cookie')
 	) {
-		const responseForCache = createCacheableResponse(response.clone());
-		const cacheWrite = pageCache.put(pageCacheKey, responseForCache).catch((error) => {
+		/*
+		 * Set the headers on the response itself and take the copy afterwards, so
+		 * the stored bytes and the served bytes come from one object. This path
+		 * used to build four Responses per miss — one per header tweak — each
+		 * copying the whole header list and re-wrapping the body.
+		 */
+		response.headers.set('Cache-Control', `public, max-age=${PAGE_CACHE_SECONDS}`);
+
+		const cacheWrite = pageCache.put(pageCacheKey, response.clone()).catch((error) => {
 			console.error(
 				JSON.stringify({
 					event: 'page_cache_write_failed',
@@ -233,7 +223,9 @@ export const handle: Handle = async ({ event, resolve }) => {
 			await cacheWrite;
 		}
 
-		return withPageCacheStatus(createCacheableResponse(response), 'MISS');
+		// After the copy, so the stored entry does not claim a cache status of
+		// its own when it is later served as a HIT.
+		response.headers.set('X-Page-Cache', 'MISS');
 	}
 
 	return response;
