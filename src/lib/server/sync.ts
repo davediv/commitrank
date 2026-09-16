@@ -11,8 +11,7 @@ import { eq, asc, and } from 'drizzle-orm';
 import { fetchContributions, GitHubApiError } from './github';
 import {
 	invalidateLeaderboardCache,
-	invalidateByPrefix,
-	CACHE_KEYS,
+	invalidateUserCache,
 	deleteCached,
 	statsKey,
 	lastSyncKey,
@@ -246,18 +245,30 @@ export async function runScheduledSync(
 		}
 	}
 
-	// Invalidate all caches after sync and store last sync timestamp
+	/*
+	 * Invalidate what this run actually changed, then store the sync timestamp.
+	 *
+	 * This used to wipe the user, profile and card prefixes wholesale. A run
+	 * touches `batchSize` users, but the wipe deleted every rendered share card
+	 * in the namespace, so each one had to be rasterized again on its next
+	 * request — the single most expensive operation in the app, re-run for the
+	 * whole user base every hour. It bought no freshness either: the PNG
+	 * carries its own Cache-Control and the adapter keeps it in `caches.default`,
+	 * which a KV delete does not reach, so the edge went on serving the old
+	 * bytes regardless.
+	 *
+	 * The leaderboard and stats keys are global aggregates — any user's numbers
+	 * moving invalidates them, so those still go every run. A profile's own
+	 * numbers only move when that profile syncs; what can drift in between is
+	 * its rank, and CACHE_TTL bounds that.
+	 */
 	const syncCompletedAt = new Date().toISOString();
 	await Promise.all([
 		invalidateLeaderboardCache(kv),
-		invalidateByPrefix(kv, CACHE_KEYS.USER),
-		invalidateByPrefix(kv, CACHE_KEYS.PROFILE),
-		// Rendered share cards embed contribution counts and ranks, so they go
-		// stale on exactly the same beat as the profile payload.
-		invalidateByPrefix(kv, CACHE_KEYS.CARD),
 		deleteCached(kv, statsKey()),
 		// Store last sync timestamp (TTL: 24 hours - long enough to survive between syncs)
-		setCached(kv, lastSyncKey(), syncCompletedAt, 86400)
+		setCached(kv, lastSyncKey(), syncCompletedAt, 86400),
+		...usersToSync.map((user) => invalidateUserCache(kv, user.github_username))
 	]);
 
 	const durationMs = Date.now() - startTime;
