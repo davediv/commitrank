@@ -2,7 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { createDb } from '$lib/server/db';
 import { users, contributions } from '$lib/server/db/schema';
-import { eq, sql, desc, and } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import {
 	createSuccessResponse,
 	createErrorResponse,
@@ -13,31 +13,7 @@ import { isValidGitHubUsername, isValidTwitterHandle } from '$lib/validation';
 import { fetchContributions, GitHubApiError } from '$lib/server/github';
 import { invalidateLeaderboardCache, deleteCached, statsKey } from '$lib/server/cache';
 import { checkRateLimit, rateLimitKey, RATE_LIMITS } from '$lib/server/ratelimit';
-
-/**
- * Calculate user's rank based on total contributions
- */
-async function calculateUserRank(db: ReturnType<typeof createDb>, userId: string): Promise<number> {
-	const now = new Date();
-	const todayStr = now.toISOString().split('T')[0];
-
-	// Get all users with their today's contributions, ordered by total
-	const rankings = await db
-		.select({
-			user_id: users.id,
-			total: sql<number>`COALESCE(SUM(${contributions.total_contributions}), 0)`.as('total')
-		})
-		.from(users)
-		.leftJoin(
-			contributions,
-			and(eq(contributions.user_id, users.id), eq(contributions.date, todayStr))
-		)
-		.groupBy(users.id)
-		.orderBy(desc(sql`total`));
-
-	const rank = rankings.findIndex((r) => r.user_id === userId) + 1;
-	return rank || 0;
-}
+import { calculateTodayRank } from '$lib/server/user-profile';
 
 export const POST: RequestHandler = async ({ request, platform, getClientAddress }) => {
 	// Rate limit check - before any processing
@@ -181,7 +157,7 @@ export const POST: RequestHandler = async ({ request, platform, getClientAddress
 		}
 
 		// Calculate initial rank
-		const rank = await calculateUserRank(db, insertedUser.id);
+		const rank = await calculateTodayRank(db, insertedUser.id);
 
 		// Invalidate cache after successful registration
 		await Promise.all([invalidateLeaderboardCache(kv), deleteCached(kv, statsKey())]);

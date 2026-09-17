@@ -141,7 +141,10 @@ function createMockDb(existingUsers: { id: string }[] = []) {
 		orderBy: vi.fn().mockResolvedValue([]),
 		insert: vi.fn().mockReturnThis(),
 		values: vi.fn().mockReturnThis(),
-		returning: vi.fn().mockResolvedValue([insertedUser])
+		returning: vi.fn().mockResolvedValue([insertedUser]),
+		// calculateTodayRank counts the users ahead in one statement rather than
+		// selecting the whole ranking table through the query builder.
+		get: vi.fn().mockResolvedValue({ rank: 1 })
 	};
 }
 

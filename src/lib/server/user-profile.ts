@@ -5,14 +5,43 @@
  * used by both the profile page server load and the API endpoint.
  */
 
-import { eq, sql, and, gte, desc } from 'drizzle-orm';
-import { users, contributions } from '$lib/server/db/schema';
+import { sql } from 'drizzle-orm';
+import { users } from '$lib/server/db/schema';
 import type { User } from '$lib/server/db/schema';
 import type { ContributionPeriod, PeriodContribution, UserProfile } from '$lib/types';
 
 type DrizzleDb = ReturnType<typeof import('$lib/server/db').createDb>;
 
 const PERIODS: ContributionPeriod[] = ['today', '7days', '30days', 'year'];
+
+/** One row of per-period totals and ranks, as both rank queries select it. */
+interface RankedTotals {
+	today_total: number;
+	today_rank: number;
+	seven_days_total: number;
+	seven_days_rank: number;
+	thirty_days_total: number;
+	thirty_days_rank: number;
+	year_total: number;
+	year_rank: number;
+}
+
+function toPeriodContributions(row: RankedTotals): PeriodContribution[] {
+	return [
+		{ period: 'today', contributions: Number(row.today_total), rank: Number(row.today_rank) },
+		{
+			period: '7days',
+			contributions: Number(row.seven_days_total),
+			rank: Number(row.seven_days_rank)
+		},
+		{
+			period: '30days',
+			contributions: Number(row.thirty_days_total),
+			rank: Number(row.thirty_days_rank)
+		},
+		{ period: 'year', contributions: Number(row.year_total), rank: Number(row.year_rank) }
+	];
+}
 
 /**
  * Get date range for a contribution period
@@ -52,17 +81,6 @@ export async function computePeriodContributions(
 	const ranges = Object.fromEntries(
 		PERIODS.map((period) => [period, getDateRange(period)])
 	) as Record<ContributionPeriod, { startDate: string; endDate: string }>;
-
-	interface RankedTotals {
-		today_total: number;
-		today_rank: number;
-		seven_days_total: number;
-		seven_days_rank: number;
-		thirty_days_total: number;
-		thirty_days_rank: number;
-		year_total: number;
-		year_rank: number;
-	}
 
 	try {
 		// Compute all four totals and ranks in one D1 statement. The previous
@@ -108,20 +126,7 @@ export async function computePeriodContributions(
 			return PERIODS.map((period) => ({ period, contributions: 0, rank: 0 }));
 		}
 
-		return [
-			{ period: 'today', contributions: Number(row.today_total), rank: Number(row.today_rank) },
-			{
-				period: '7days',
-				contributions: Number(row.seven_days_total),
-				rank: Number(row.seven_days_rank)
-			},
-			{
-				period: '30days',
-				contributions: Number(row.thirty_days_total),
-				rank: Number(row.thirty_days_rank)
-			},
-			{ period: 'year', contributions: Number(row.year_total), rank: Number(row.year_rank) }
-		];
+		return toPeriodContributions(row);
 	} catch (error) {
 		// Keep compatibility with older/local SQLite builds while the optimized
 		// query is rolled out. This path preserves correctness at higher latency.
@@ -133,53 +138,81 @@ export async function computePeriodContributions(
 		);
 	}
 
-	return Promise.all(
-		PERIODS.map(async (period) => {
-			const { startDate, endDate } = ranges[period];
+	/*
+	 * Same four totals and ranks without window functions, for a SQLite that
+	 * predates them. Ranks are counted rather than ordered, so this no longer
+	 * pulls four complete ranking tables into the Worker to read four indices
+	 * out of them — that was the expensive part, not ROW_NUMBER.
+	 */
+	const fallback = await db.get<RankedTotals>(sql`
+		WITH totals AS (
+			SELECT
+				u.id AS id,
+				COALESCE(SUM(CASE WHEN c.date = ${ranges.today.startDate} THEN c.total_contributions ELSE 0 END), 0) AS today_total,
+				COALESCE(SUM(CASE WHEN c.date >= ${ranges['7days'].startDate} AND c.date <= ${ranges['7days'].endDate} THEN c.total_contributions ELSE 0 END), 0) AS seven_days_total,
+				COALESCE(SUM(CASE WHEN c.date >= ${ranges['30days'].startDate} AND c.date <= ${ranges['30days'].endDate} THEN c.total_contributions ELSE 0 END), 0) AS thirty_days_total,
+				COALESCE(SUM(CASE WHEN c.date >= ${ranges.year.startDate} AND c.date <= ${ranges.year.endDate} THEN c.total_contributions ELSE 0 END), 0) AS year_total
+			FROM users AS u
+			LEFT JOIN contributions AS c
+				ON c.user_id = u.id
+				AND c.date >= ${ranges.year.startDate}
+				AND c.date <= ${ranges.year.endDate}
+			GROUP BY u.id
+		)
+		SELECT
+			t.today_total,
+			1 + (SELECT COUNT(*) FROM totals AS o WHERE o.today_total > t.today_total OR (o.today_total = t.today_total AND o.id < t.id)) AS today_rank,
+			t.seven_days_total,
+			1 + (SELECT COUNT(*) FROM totals AS o WHERE o.seven_days_total > t.seven_days_total OR (o.seven_days_total = t.seven_days_total AND o.id < t.id)) AS seven_days_rank,
+			t.thirty_days_total,
+			1 + (SELECT COUNT(*) FROM totals AS o WHERE o.thirty_days_total > t.thirty_days_total OR (o.thirty_days_total = t.thirty_days_total AND o.id < t.id)) AS thirty_days_rank,
+			t.year_total,
+			1 + (SELECT COUNT(*) FROM totals AS o WHERE o.year_total > t.year_total OR (o.year_total = t.year_total AND o.id < t.id)) AS year_rank
+		FROM totals AS t
+		WHERE t.id = ${userId}
+	`);
 
-			const [contribResult, rankResult] = await Promise.all([
-				// Get user's total contributions for this period
-				db
-					.select({
-						total: sql<number>`COALESCE(SUM(${contributions.total_contributions}), 0)`
-					})
-					.from(contributions)
-					.where(
-						and(
-							eq(contributions.user_id, userId),
-							gte(contributions.date, startDate),
-							sql`${contributions.date} <= ${endDate}`
-						)
-					),
-				// Get all users ranked by contributions for this period
-				db
-					.select({
-						user_id: users.id,
-						total: sql<number>`COALESCE(SUM(${contributions.total_contributions}), 0)`.as('total')
-					})
-					.from(users)
-					.leftJoin(
-						contributions,
-						and(
-							eq(contributions.user_id, users.id),
-							gte(contributions.date, startDate),
-							sql`${contributions.date} <= ${endDate}`
-						)
-					)
-					.groupBy(users.id)
-					.orderBy(desc(sql`total`))
-			]);
+	if (!fallback) {
+		return PERIODS.map((period) => ({ period, contributions: 0, rank: 0 }));
+	}
 
-			const userContributions = Number(contribResult[0]?.total || 0);
-			const rank = rankResult.findIndex((r) => r.user_id === userId) + 1;
+	return toPeriodContributions(fallback);
+}
 
-			return {
-				period,
-				contributions: userContributions,
-				rank: rank || 0
-			};
-		})
-	);
+/**
+ * Rank a user by today's contributions.
+ *
+ * Counts the users ahead instead of materializing the ordering. The previous
+ * implementation — duplicated in the join action and the register endpoint —
+ * selected every user row with their daily total, shipped the whole table to
+ * the Worker and linear-scanned it for one index. That is Worker CPU and D1
+ * rows-read proportional to the entire user base, on every registration.
+ *
+ * The tiebreak matches the ROW_NUMBER ordering in `computePeriodContributions`,
+ * so the rank a user is told at registration is the one their profile shows.
+ * `findIndex` over a `total DESC` sort left ties to SQLite's discretion, and
+ * the two could disagree.
+ */
+export async function calculateTodayRank(db: DrizzleDb, userId: string): Promise<number> {
+	const { startDate } = getDateRange('today');
+
+	const row = await db.get<{ rank: number }>(sql`
+		WITH totals AS (
+			SELECT u.id AS id, COALESCE(SUM(c.total_contributions), 0) AS total
+			FROM users AS u
+			LEFT JOIN contributions AS c
+				ON c.user_id = u.id AND c.date = ${startDate}
+			GROUP BY u.id
+		)
+		SELECT 1 + (
+			SELECT COUNT(*) FROM totals AS o
+			WHERE o.total > t.total OR (o.total = t.total AND o.id < t.id)
+		) AS rank
+		FROM totals AS t
+		WHERE t.id = ${userId}
+	`);
+
+	return Number(row?.rank ?? 0);
 }
 
 /**
