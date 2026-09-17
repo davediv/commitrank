@@ -151,7 +151,23 @@ function createMockDbForGet(userExists: boolean) {
 	};
 
 	return {
-		select: vi.fn().mockReturnValue(mockSelectChain)
+		select: vi.fn().mockReturnValue(mockSelectChain),
+		/*
+		 * computePeriodContributions resolves all four periods in a single
+		 * statement. This mock previously had no `get`, and the test passed only
+		 * because the throw was caught and the fallback happened to reach for the
+		 * query builder instead — the fallback now uses one statement too.
+		 */
+		get: vi.fn().mockResolvedValue({
+			today_total: 100,
+			today_rank: 1,
+			seven_days_total: 100,
+			seven_days_rank: 1,
+			thirty_days_total: 100,
+			thirty_days_rank: 1,
+			year_total: 100,
+			year_rank: 1
+		})
 	};
 }
 
