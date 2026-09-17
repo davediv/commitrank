@@ -18,6 +18,14 @@ export const DAYS_IN_WEEK = 7;
 /** Number of steps in the phosphor ramp, level 0 (empty) included. */
 export const HEATMAP_LEVELS = 5;
 
+const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+/** February needs the leap rule; every other month is a constant. */
+function daysInUtcMonth(year: number, month: number): number {
+	if (month !== 1) return DAYS_IN_MONTH[month];
+	return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0 ? 29 : 28;
+}
+
 export const MONTH_NAMES = [
 	'Jan',
 	'Feb',
@@ -111,12 +119,24 @@ export function buildHeatmapGrid(
 	const months: HeatmapMonth[] = [];
 	let lastMonth = -1;
 
+	/*
+	 * Walked arithmetically rather than by allocating a Date per day and
+	 * formatting it. `new Date().toISOString()` across the window was about
+	 * two thirds of this function's cost, and it runs on every profile render
+	 * and again for every share card.
+	 *
+	 * The window always opens on the Sunday that starts it, so the weekday is
+	 * the loop index and needs no lookup either.
+	 */
+	const start = new Date(startMs);
+	let year = start.getUTCFullYear();
+	let month = start.getUTCMonth();
+	let day = start.getUTCDate();
+
 	for (let d = 0; d < totalDays; d++) {
-		const current = new Date(startMs + d * DAY_MS);
-		const date = current.toISOString().slice(0, 10);
-		const row = current.getUTCDay();
-		const col = Math.floor(d / DAYS_IN_WEEK);
-		const month = current.getUTCMonth();
+		const row = d % DAYS_IN_WEEK;
+		const col = (d / DAYS_IN_WEEK) | 0;
+		const date = `${year}-${month < 9 ? '0' : ''}${month + 1}-${day < 10 ? '0' : ''}${day}`;
 
 		// Labelled from the top row only, so a month never lands mid-column.
 		if (month !== lastMonth && row === 0) {
@@ -126,6 +146,14 @@ export function buildHeatmapGrid(
 
 		const dayCount = countByDate[date] || 0;
 		cells.push({ date, count: dayCount, col, row, level: levelOf(dayCount) });
+
+		if (++day > daysInUtcMonth(year, month)) {
+			day = 1;
+			if (++month > 11) {
+				month = 0;
+				year++;
+			}
+		}
 	}
 
 	return { cells, months, weeks: Math.ceil(totalDays / DAYS_IN_WEEK) };
