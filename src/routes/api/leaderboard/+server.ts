@@ -52,26 +52,37 @@ export const GET: RequestHandler = async ({ url, platform, getClientAddress }) =
 	// Rate limit check
 	const kv = platform!.env.KV;
 	const clientIp = getClientAddress();
-	const rateLimitResult = await checkRateLimit(
-		kv,
-		rateLimitKey(clientIp, 'leaderboard'),
-		RATE_LIMITS.LEADERBOARD.limit,
-		RATE_LIMITS.LEADERBOARD.windowSeconds
-	);
+	const { limit: rateLimit, windowSeconds } = RATE_LIMITS.LEADERBOARD;
 
-	if (!rateLimitResult.allowed) {
+	/*
+	 * Cloudflare's rate limiting binding keeps its counters in the colo, so it
+	 * costs no KV operation. `checkRateLimit` needs a read *and* a write on
+	 * every request, which is a poor trade on the endpoint that has to be the
+	 * cheapest thing here. The register and update limits stay on KV: their
+	 * windows are an hour and the binding only supports 10s and 60s.
+	 *
+	 * The fallback keeps local dev, unit tests and any deploy predating the
+	 * binding on exactly the previous behavior.
+	 */
+	const limiter = platform!.env.LEADERBOARD_LIMITER;
+	const allowed = limiter
+		? (await limiter.limit({ key: clientIp })).success
+		: (await checkRateLimit(kv, rateLimitKey(clientIp, 'leaderboard'), rateLimit, windowSeconds))
+				.allowed;
+
+	if (!allowed) {
 		return json(
 			createErrorResponse(
 				API_ERROR_CODES.RATE_LIMITED,
-				`Rate limit exceeded. Try again in ${rateLimitResult.resetIn} seconds.`
+				`Rate limit exceeded. Try again in ${windowSeconds} seconds.`
 			),
 			{
 				status: 429,
 				headers: {
-					'Retry-After': rateLimitResult.resetIn.toString(),
-					'X-RateLimit-Limit': RATE_LIMITS.LEADERBOARD.limit.toString(),
+					'Retry-After': windowSeconds.toString(),
+					'X-RateLimit-Limit': rateLimit.toString(),
 					'X-RateLimit-Remaining': '0',
-					'X-RateLimit-Reset': Math.ceil(Date.now() / 1000 + rateLimitResult.resetIn).toString()
+					'X-RateLimit-Reset': Math.ceil(Date.now() / 1000 + windowSeconds).toString()
 				}
 			}
 		);

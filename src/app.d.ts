@@ -11,6 +11,16 @@ declare global {
 				SYNC_BATCH_SIZE?: string;
 				/** Optional delay between GitHub requests in milliseconds */
 				SYNC_REQUEST_DELAY_MS?: string;
+				/**
+				 * Rate Limiting binding for GET /api/leaderboard, declared in
+				 * wrangler.jsonc under `ratelimits`.
+				 *
+				 * Declared by hand because `wrangler types` (4.58) does not emit
+				 * ratelimits bindings into Env, though `wrangler deploy` does create
+				 * the binding. Optional so the route keeps working where it is
+				 * absent — local dev, unit tests, and any deploy predating it.
+				 */
+				LEADERBOARD_LIMITER?: RateLimit;
 			};
 			ctx: ExecutionContext;
 			caches: CacheStorage;
