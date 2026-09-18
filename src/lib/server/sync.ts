@@ -7,7 +7,7 @@
 
 import { createDb } from './db';
 import { users, contributions } from './db/schema';
-import { eq, asc, and } from 'drizzle-orm';
+import { eq, asc, and, sql } from 'drizzle-orm';
 import { fetchContributions, GitHubApiError } from './github';
 import {
 	invalidateLeaderboardCache,
@@ -195,8 +195,8 @@ export async function runScheduledSync(
 	const trigger = options?.trigger ?? 'api';
 
 	// Count total users in database
-	const countResult = await db.select({ count: users.id }).from(users);
-	const totalUsersInDb = countResult.length;
+	const [countResult] = await db.select({ count: sql<number>`COUNT(*)` }).from(users);
+	const totalUsersInDb = Number(countResult.count);
 
 	// Fetch batch of users ordered by least recently updated
 	const usersToSync = await db
