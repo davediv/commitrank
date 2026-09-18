@@ -86,7 +86,8 @@ function createMockDb() {
 	return {
 		select: vi.fn().mockReturnThis(),
 		from: vi.fn().mockReturnThis(),
-		leftJoin: vi.fn().mockReturnThis(),
+		innerJoin: vi.fn().mockReturnThis(),
+		having: vi.fn().mockReturnThis(),
 		groupBy: vi.fn().mockReturnThis(),
 		orderBy: vi.fn().mockReturnThis(),
 		limit: vi.fn().mockReturnThis(),

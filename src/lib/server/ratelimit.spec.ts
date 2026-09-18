@@ -115,7 +115,7 @@ describe('Rate Limit Utilities', () => {
 	describe('RATE_LIMITS', () => {
 		it('should have REGISTER config', () => {
 			expect(RATE_LIMITS.REGISTER).toBeDefined();
-			expect(RATE_LIMITS.REGISTER.limit).toBe(5);
+			expect(RATE_LIMITS.REGISTER.limit).toBe(60);
 			expect(RATE_LIMITS.REGISTER.windowSeconds).toBe(3600);
 		});
 
