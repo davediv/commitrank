@@ -20,13 +20,14 @@ import {
 	cardKey,
 	CACHE_TTL,
 	getBinary,
-	setBinary,
 	getCached,
 	setCached,
 	profilePageKey
 } from '$lib/server/cache';
 import { getOrFetchAvatar } from '$lib/server/avatar';
-import { renderCardPng, toDataUri } from '$lib/server/card-png';
+import { renderCardSvgPng, toDataUri } from '$lib/server/card-png';
+import { renderCardSvg } from '$lib/server/card-svg';
+import { cardArtifactKey, getCardArtifact, cacheCardArtifact } from '$lib/server/card-artifact';
 import {
 	computePeriodContributions,
 	findUserByUsername,
@@ -131,20 +132,25 @@ export const GET: RequestHandler = async ({ params, platform, url }) => {
 	}
 
 	try {
-		const png = await renderCardPng({
+		const svg = renderCardSvg({
 			profile: pageData.profile,
 			dailyContributions: pageData.dailyContributions,
 			avatarDataUri
 		});
 
-		const body = toArrayBuffer(png);
-		const write = setBinary(kv, key, body, CACHE_TTL.CARD, {
-			contentType: 'image/png'
-		});
+		// Revalidate profile/ranks/avatar first, then reuse only identical output.
+		const artifactKey = await cardArtifactKey(svg);
+		const artifact = await getCardArtifact(kv, artifactKey);
+		const body = artifact?.body ?? toArrayBuffer(await renderCardSvgPng(svg));
+		const write = cacheCardArtifact(kv, username, artifactKey, body, artifact?.expiresAt).catch(
+			(error) => {
+				console.error('Card cache write failed:', error);
+			}
+		);
 		if (platform?.ctx) platform.ctx.waitUntil(write);
 		else await write;
 
-		return pngResponse(body, 'MISS');
+		return pngResponse(body, artifact ? 'HIT' : 'MISS');
 	} catch (error) {
 		console.error(
 			JSON.stringify({
