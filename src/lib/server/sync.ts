@@ -213,7 +213,6 @@ export async function runScheduledSync(
 
 		if (result.success) {
 			successCount++;
-			console.log(`[Sync] ✓ ${user.github_username}: ${result.contributionsUpdated} contributions`);
 		} else {
 			failureCount++;
 			console.log(`[Sync] ✗ ${user.github_username}: ${result.error}`);
@@ -265,6 +264,10 @@ export async function runScheduledSync(
 			usersSynced: usersToSync.length,
 			successCount,
 			failureCount,
+			contributionDaysUpdated: results.reduce(
+				(total, result) => total + (result.contributionsUpdated ?? 0),
+				0
+			),
 			durationMs,
 			batchSize,
 			requestDelayMs
