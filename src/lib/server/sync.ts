@@ -6,8 +6,9 @@
  */
 
 import { createDb } from './db';
-import { users, contributions } from './db/schema';
-import { eq, asc, and, sql } from 'drizzle-orm';
+import { reconcileContributions } from './db/reconcile-contributions';
+import { users } from './db/schema';
+import { eq, asc, sql } from 'drizzle-orm';
 import { fetchContributions, GitHubApiError } from './github';
 import {
 	invalidateLeaderboardCache,
@@ -82,36 +83,13 @@ async function syncUserContributions(
 			to: now.toISOString()
 		});
 
-		// Get contribution days with data
-		const contributionValues = githubData.contributions.days
-			.filter((day) => day.contributionCount > 0)
-			.map((day) => ({
-				user_id: userId,
-				date: day.date,
-				commit_count: day.contributionCount,
-				pr_count: 0,
-				issue_count: 0,
-				review_count: 0,
-				total_contributions: day.contributionCount
-			}));
-
-		// Upsert contribution records
-		// D1/SQLite doesn't have great upsert support, so we'll delete and insert
-		// For performance, we only update the last 7 days
-		// Filter to recent contributions only
-		const recentContributions = contributionValues.filter((c) => c.date >= cutoffDate);
-
-		if (recentContributions.length > 0) {
-			// Delete existing records for these dates
-			for (const contrib of recentContributions) {
-				await db
-					.delete(contributions)
-					.where(and(eq(contributions.user_id, userId), eq(contributions.date, contrib.date)));
-			}
-
-			// Insert new records
-			await db.insert(contributions).values(recentContributions);
-		}
+		const contributionsUpdated = await reconcileContributions(
+			db,
+			userId,
+			githubData.contributions.days,
+			cutoffDate,
+			now.toISOString().slice(0, 10)
+		);
 
 		// Update user's updated_at timestamp
 		await db
@@ -130,9 +108,9 @@ async function syncUserContributions(
 			})
 			.where(eq(users.id, userId));
 
-		// Cache avatar in KV (fire-and-forget, don't block on failure)
+		// Track completion so the scheduled invocation cannot drop the refresh.
 		if (githubData.user.avatarUrl) {
-			fetchAndCacheAvatar(kv, username, githubData.user.avatarUrl).catch(() => {
+			await fetchAndCacheAvatar(kv, username, githubData.user.avatarUrl).catch(() => {
 				// Silently ignore avatar cache failures
 			});
 		}
@@ -140,7 +118,7 @@ async function syncUserContributions(
 		return {
 			username,
 			success: true,
-			contributionsUpdated: recentContributions.length
+			contributionsUpdated
 		};
 	} catch (error) {
 		const errorMessage =
