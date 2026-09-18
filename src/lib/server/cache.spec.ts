@@ -258,3 +258,33 @@ describe('Cache Utilities', () => {
 		});
 	});
 });
+
+describe('prefix invalidation concurrency', () => {
+	it('deletes all pages with at most 20 deletes in flight', async () => {
+		let active = 0;
+		let peak = 0;
+		const kv = createMockKV();
+		vi.mocked(kv.list)
+			.mockResolvedValueOnce({
+				keys: Array.from({ length: 45 }, (_, i) => ({ name: `leaderboard:${i}` })),
+				list_complete: false,
+				cursor: 'next',
+				cacheStatus: null
+			})
+			.mockResolvedValueOnce({
+				keys: [{ name: 'leaderboard:last' }],
+				list_complete: true,
+				cacheStatus: null
+			});
+		vi.mocked(kv.delete).mockImplementation(async () => {
+			active++;
+			peak = Math.max(peak, active);
+			await Promise.resolve();
+			active--;
+		});
+		await invalidateLeaderboardCache(kv);
+		expect(kv.delete).toHaveBeenCalledTimes(46);
+		expect(peak).toBeLessThanOrEqual(20);
+		expect(kv.list).toHaveBeenLastCalledWith({ prefix: 'leaderboard', cursor: 'next' });
+	});
+});

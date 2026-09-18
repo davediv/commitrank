@@ -112,7 +112,7 @@ async function queryLeaderboard(
 					totalPages: Math.ceil(total / limit)
 				}
 			},
-			cacheable: true
+			cacheable: page === 1 || leaderboardRows.length > 0
 		};
 	} catch (error) {
 		console.error('Leaderboard load error:', error);
@@ -199,7 +199,13 @@ export const load: PageServerLoad = async ({ url, platform, setHeaders }) => {
 
 	// Set cache headers
 	setHeaders({
-		'Cache-Control': cached ? 'public, max-age=60' : 'public, max-age=30'
+		'Cache-Control':
+			(!cached && !leaderboardResult.cacheable) ||
+			(page > 1 && leaderboardResult.data.leaderboard.length === 0)
+				? 'no-store'
+				: cached
+					? 'public, max-age=60'
+					: 'public, max-age=30'
 	});
 
 	return {
