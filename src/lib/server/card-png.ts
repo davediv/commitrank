@@ -65,5 +65,15 @@ export async function renderCardPng(options: CardSvgOptions): Promise<Uint8Array
 		}
 	});
 
-	return resvg.render().asPng();
+	try {
+		const image = resvg.render();
+		try {
+			// asPng returns JS-owned bytes, independent of the Wasm allocations.
+			return image.asPng();
+		} finally {
+			image.free();
+		}
+	} finally {
+		resvg.free();
+	}
 }
