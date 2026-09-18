@@ -1,8 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { createDb } from '$lib/server/db';
-import { users, contributions } from '$lib/server/db/schema';
-import { sql, gte } from 'drizzle-orm';
 import {
 	createSuccessResponse,
 	createErrorResponse,
@@ -10,6 +8,7 @@ import {
 	type StatsResponse
 } from '$lib/types';
 import { getCached, setCached, statsKey, CACHE_TTL } from '$lib/server/cache';
+import { queryStats } from '$lib/server/stats';
 import { calculateNextHourlySync } from '$lib/server/sync-config';
 
 export const GET: RequestHandler = async ({ platform }) => {
@@ -31,46 +30,7 @@ export const GET: RequestHandler = async ({ platform }) => {
 		// Cache miss - query database
 		const db = createDb(platform!.env.DB);
 
-		const now = new Date();
-		const todayStr = now.toISOString().split('T')[0];
-		const yearAgo = new Date(now);
-		yearAgo.setFullYear(yearAgo.getFullYear() - 1);
-		yearAgo.setDate(yearAgo.getDate() + 1);
-		const yearAgoStr = yearAgo.toISOString().split('T')[0];
-
-		// Run queries in parallel
-		const [totalUsersResult, todayContribResult, yearContribResult, lastSyncResult] =
-			await Promise.all([
-				// Total users count
-				db.select({ count: sql<number>`COUNT(*)` }).from(users),
-
-				// Total contributions today
-				db
-					.select({
-						total: sql<number>`COALESCE(SUM(${contributions.total_contributions}), 0)`
-					})
-					.from(contributions)
-					.where(sql`${contributions.date} = ${todayStr}`),
-
-				// Total contributions in the past year
-				db
-					.select({
-						total: sql<number>`COALESCE(SUM(${contributions.total_contributions}), 0)`
-					})
-					.from(contributions)
-					.where(gte(contributions.date, yearAgoStr)),
-
-				// Last sync (most recent updated_at from users)
-				db.select({ updated_at: sql<string>`MAX(${users.updated_at})` }).from(users)
-			]);
-
-		const stats: StatsResponse = {
-			total_users: Number(totalUsersResult[0]?.count || 0),
-			total_contributions_today: Number(todayContribResult[0]?.total || 0),
-			total_contributions_year: Number(yearContribResult[0]?.total || 0),
-			last_sync: lastSyncResult[0]?.updated_at || null,
-			next_sync: calculateNextHourlySync()
-		};
+		const stats = await queryStats(db);
 
 		const cacheWrite = setCached(kv, cacheKey, stats, CACHE_TTL.STATS);
 		if (platform?.ctx) {

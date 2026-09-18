@@ -105,6 +105,13 @@ describe('load /+page.server.ts', () => {
 		} as Parameters<typeof load>[0])) as Exclude<Awaited<ReturnType<typeof load>>, void>;
 
 		expect(result.stats).not.toBeNull();
+		expect(result.stats?.total_contributions_year).toBe(5000);
+		expect(setCached).toHaveBeenCalledWith(
+			expect.anything(),
+			'stats',
+			expect.objectContaining({ total_contributions_year: 5000 }),
+			21600
+		);
 		expect(result.stats?.next_sync).toBe('2026-02-12T14:00:00.000Z');
 		expect(result.cached).toBe(true);
 		expect(capturedHeaders['Cache-Control']).toBe('public, max-age=60');
