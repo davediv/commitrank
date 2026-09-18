@@ -71,8 +71,16 @@ async function syncUserContributions(
 	token: string
 ): Promise<SyncResult> {
 	try {
+		// Use the same inclusive UTC window for the request and reconciliation.
+		const now = new Date();
+		const sevenDaysAgo = new Date(now);
+		sevenDaysAgo.setUTCDate(sevenDaysAgo.getUTCDate() - 7);
+		const cutoffDate = sevenDaysAgo.toISOString().slice(0, 10);
 		// Fetch fresh contribution data from GitHub
-		const githubData = await fetchContributions(username, token);
+		const githubData = await fetchContributions(username, token, {
+			from: `${cutoffDate}T00:00:00.000Z`,
+			to: now.toISOString()
+		});
 
 		// Get contribution days with data
 		const contributionValues = githubData.contributions.days
@@ -90,10 +98,6 @@ async function syncUserContributions(
 		// Upsert contribution records
 		// D1/SQLite doesn't have great upsert support, so we'll delete and insert
 		// For performance, we only update the last 7 days
-		const sevenDaysAgo = new Date();
-		sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-		const cutoffDate = sevenDaysAgo.toISOString().split('T')[0];
-
 		// Filter to recent contributions only
 		const recentContributions = contributionValues.filter((c) => c.date >= cutoffDate);
 

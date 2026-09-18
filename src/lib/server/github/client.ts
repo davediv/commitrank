@@ -86,7 +86,7 @@ export interface GitHubContributionData {
  * GraphQL query for fetching user contributions
  */
 const CONTRIBUTION_QUERY = `
-query GetUserContributions($username: String!) {
+query GetUserContributions($username: String!, $from: DateTime, $to: DateTime) {
   user(login: $username) {
     login
     id
@@ -108,7 +108,7 @@ query GetUserContributions($username: String!) {
       totalCount
     }
     createdAt
-    contributionsCollection {
+    contributionsCollection(from: $from, to: $to) {
       contributionCalendar {
         totalContributions
         weeks {
@@ -178,7 +178,8 @@ export async function validateGitHubUser(username: string, token: string): Promi
  */
 export async function fetchContributions(
 	username: string,
-	token: string
+	token: string,
+	window?: { from: string; to: string }
 ): Promise<GitHubContributionData> {
 	const response = await fetch(GITHUB_GRAPHQL_URL, {
 		method: 'POST',
@@ -189,7 +190,7 @@ export async function fetchContributions(
 		},
 		body: JSON.stringify({
 			query: CONTRIBUTION_QUERY,
-			variables: { username }
+			variables: { username, ...window }
 		})
 	});
 
