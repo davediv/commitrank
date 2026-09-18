@@ -46,6 +46,7 @@ export const users = sqliteTable(
 	(table) => [
 		// Performance indexes
 		index('users_github_username_idx').on(table.github_username),
+		index('users_github_username_nocase_idx').on(sql`${table.github_username} COLLATE NOCASE`),
 		index('users_updated_at_idx').on(table.updated_at)
 	]
 );
