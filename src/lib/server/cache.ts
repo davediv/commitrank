@@ -1,3 +1,5 @@
+import { recordCacheOutcome } from './cpu-observability.js';
+
 /**
  * KV Cache Helper Utilities for CommitRank
  *
@@ -113,11 +115,15 @@ export function avatarKey(username: string, size?: number): string {
 export async function getCached<T>(kv: KVNamespace, key: string): Promise<T | null> {
 	const value = await kv.get(key);
 	if (value === null) {
+		recordCacheOutcome('kv', 'miss', key.split(':', 1)[0]);
 		return null;
 	}
 	try {
-		return JSON.parse(value) as T;
+		const parsed = JSON.parse(value) as T;
+		recordCacheOutcome('kv', 'hit', key.split(':', 1)[0]);
+		return parsed;
 	} catch {
+		recordCacheOutcome('kv', 'invalid', key.split(':', 1)[0]);
 		return null;
 	}
 }
@@ -227,7 +233,9 @@ export async function getOrSet<T>(
  * @returns ArrayBuffer or null if not found
  */
 export async function getBinary(kv: KVNamespace, key: string): Promise<ArrayBuffer | null> {
-	return await kv.get(key, 'arrayBuffer');
+	const value = await kv.get(key, 'arrayBuffer');
+	recordCacheOutcome('kv', value === null ? 'miss' : 'hit', key.split(':', 1)[0]);
+	return value;
 }
 
 /**
@@ -261,6 +269,7 @@ export async function getBinaryWithMetadata(
 	key: string
 ): Promise<{ value: ArrayBuffer; metadata: Record<string, string> | null } | null> {
 	const result = await kv.getWithMetadata<Record<string, string>>(key, 'arrayBuffer');
+	recordCacheOutcome('kv', result.value === null ? 'miss' : 'hit', key.split(':', 1)[0]);
 	if (result.value === null) {
 		return null;
 	}

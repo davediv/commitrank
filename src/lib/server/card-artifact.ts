@@ -1,4 +1,5 @@
 import { Buffer } from 'node:buffer';
+import { recordCacheOutcome } from './cpu-observability.js';
 import { CARD_RASTER_SIZE } from '$lib/card-layout';
 import { getCardFonts } from './card-fonts';
 import { CACHE_TTL, cardKey } from './cache';
@@ -21,8 +22,10 @@ export async function cardArtifactKey(svg: string): Promise<string> {
 export async function getCardArtifact(kv: KVNamespace, key: string) {
 	const { value, metadata } = await kv.getWithMetadata<{ expiresAt: number }>(key, 'arrayBuffer');
 	if (!value || !Number.isFinite(metadata?.expiresAt) || metadata!.expiresAt <= Date.now() / 1000) {
+		recordCacheOutcome('kv', 'miss', 'card-artifact');
 		return null;
 	}
+	recordCacheOutcome('kv', 'hit', 'card-artifact');
 	return { body: value, expiresAt: metadata!.expiresAt };
 }
 
