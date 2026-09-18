@@ -1,7 +1,8 @@
 import { fail, redirect, isRedirect } from '@sveltejs/kit';
 import type { Actions } from './$types';
 import { createDb } from '$lib/server/db';
-import { users, contributions } from '$lib/server/db/schema';
+import { insertContributions } from '$lib/server/db/contribution-inserts';
+import { users } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
 import { API_ERROR_CODES } from '$lib/types';
 import { isValidGitHubUsername, isValidTwitterHandle } from '$lib/validation';
@@ -142,10 +143,7 @@ export const actions: Actions = {
 			const insertedUser = newUser[0];
 			log.info('User inserted successfully', { userId: insertedUser.id });
 
-			// Insert contribution data for each day using multi-row inserts
-			// D1/SQLite has a 999 parameter limit per query and per batch
-			// With 7 columns, we can safely insert ~100 rows per statement
-			// Execute each insert separately to avoid batch variable limits
+			// Batch bounded statements within D1's 100-parameter limit.
 			if (githubData.contributions.days.length > 0) {
 				const contributionValues = githubData.contributions.days
 					.filter((day) => day.contributionCount > 0)
@@ -164,50 +162,9 @@ export const actions: Actions = {
 					daysWithContributions: contributionValues.length
 				});
 
-				if (contributionValues.length > 0) {
-					// D1 limit: Maximum 100 bound parameters per query
-					// Each row has 8 parameters, so max 12 rows per query (12 × 8 = 96 params)
-					// Using D1 batch to execute all inserts in a single network request
-					const CHUNK_SIZE = 12;
-					const totalChunks = Math.ceil(contributionValues.length / CHUNK_SIZE);
-
-					log.info('Preparing batched contribution inserts', {
-						totalRows: contributionValues.length,
-						chunkSize: CHUNK_SIZE,
-						totalChunks
-					});
-
-					// Build array of insert statements for batch execution
-					const insertStatements = [];
-					for (let i = 0; i < contributionValues.length; i += CHUNK_SIZE) {
-						const chunk = contributionValues.slice(i, i + CHUNK_SIZE);
-						insertStatements.push(db.insert(contributions).values(chunk));
-					}
-
-					// Execute all inserts in a single batch (1 network request instead of N)
-					log.time('insert-contributions-batch');
-					try {
-						// db.batch requires at least one statement - we've already checked contributionValues.length > 0
-						await db.batch(
-							insertStatements as [
-								(typeof insertStatements)[0],
-								...(typeof insertStatements)[number][]
-							]
-						);
-						log.timeEnd('insert-contributions-batch');
-						log.info('All contributions inserted successfully via batch', {
-							totalRowsInserted: contributionValues.length,
-							batchStatements: insertStatements.length
-						});
-					} catch (batchError) {
-						log.timeEnd('insert-contributions-batch');
-						log.error('Batch insert failed', {
-							totalStatements: insertStatements.length,
-							error: batchError instanceof Error ? batchError.message : String(batchError)
-						});
-						throw batchError;
-					}
-				}
+				log.time('insert-contributions-batch');
+				await insertContributions(db, contributionValues);
+				log.timeEnd('insert-contributions-batch');
 			} else {
 				log.info('No contribution days to insert');
 			}

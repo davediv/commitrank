@@ -139,6 +139,7 @@ function createMockDb(existingUsers: { id: string }[] = []) {
 		leftJoin: vi.fn().mockReturnThis(),
 		groupBy: vi.fn().mockReturnThis(),
 		orderBy: vi.fn().mockResolvedValue([]),
+		batch: vi.fn().mockResolvedValue([]),
 		insert: vi.fn().mockReturnThis(),
 		values: vi.fn().mockReturnThis(),
 		returning: vi.fn().mockResolvedValue([insertedUser]),
@@ -191,6 +192,24 @@ describe('POST /api/users', () => {
 		});
 		// Default: GitHub fetch succeeds
 		vi.mocked(fetchContributions).mockResolvedValue(mockGitHubData);
+	});
+
+	it('batches a full year of registration contributions', async () => {
+		const db = createMockDb();
+		vi.mocked(createDb).mockReturnValue(db as any);
+		vi.mocked(fetchContributions).mockResolvedValue({
+			...mockGitHubData,
+			contributions: {
+				...mockGitHubData.contributions,
+				days: Array.from({ length: 365 }, (_, i) => ({ date: `day-${i}`, contributionCount: 1 }))
+			}
+		});
+		const response = await POST(createMockRequestEvent({ github_username: 'testuser' }));
+		expect(response.status).toBe(201);
+		expect(db.batch).toHaveBeenCalledOnce();
+		const chunks = db.values.mock.calls.map(([rows]) => rows).filter(Array.isArray);
+		expect(chunks.every((rows) => rows.length <= 11)).toBe(true);
+		expect(chunks.reduce((sum, rows) => sum + rows.length, 0)).toBe(365);
 	});
 
 	describe('Rate Limiting', () => {
