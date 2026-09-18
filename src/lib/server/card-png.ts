@@ -47,9 +47,13 @@ export function toDataUri(data: ArrayBuffer, contentType: string): string {
 }
 
 export async function renderCardPng(options: CardSvgOptions): Promise<Uint8Array> {
+	return renderCardSvgPng(renderCardSvg(options));
+}
+
+export async function renderCardSvgPng(svg: string): Promise<Uint8Array> {
 	await ensureWasm();
 
-	const resvg = new Resvg(renderCardSvg(options), {
+	const resvg = new Resvg(svg, {
 		/*
 		 * Well under the 1080-unit layout, and far under the 2x canvas the browser
 		 * draws for download. Rasterizing is the entire cost of this endpoint and
