@@ -205,12 +205,14 @@ export const GET: RequestHandler = async ({ url, platform, getClientAddress }) =
 			}
 		};
 
-		// Cache the response
-		const cacheWrite = setCached(kv, cacheKey, response, CACHE_TTL.LEADERBOARD);
-		if (platform?.ctx) {
-			platform.ctx.waitUntil(cacheWrite);
-		} else {
-			await cacheWrite;
+		// Arbitrary out-of-range pages must not grow the KV namespace.
+		if (page === 1 || leaderboard.length > 0) {
+			const cacheWrite = setCached(kv, cacheKey, response, CACHE_TTL.LEADERBOARD);
+			if (platform?.ctx) {
+				platform.ctx.waitUntil(cacheWrite);
+			} else {
+				await cacheWrite;
+			}
 		}
 
 		return json(createSuccessResponse(response, { cached: false }));

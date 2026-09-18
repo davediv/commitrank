@@ -163,7 +163,10 @@ export async function invalidateByPrefix(kv: KVNamespace, prefix: string): Promi
 	// everything past the first page.
 	do {
 		const list = await kv.list({ prefix, cursor });
-		await Promise.all(list.keys.map((key) => kv.delete(key.name)));
+		// Keep large namespaces from scheduling 1000 simultaneous operations.
+		for (let i = 0; i < list.keys.length; i += 20) {
+			await Promise.all(list.keys.slice(i, i + 20).map((key) => kv.delete(key.name)));
+		}
 		cursor = list.list_complete ? undefined : list.cursor;
 	} while (cursor);
 }

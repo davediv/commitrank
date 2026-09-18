@@ -196,6 +196,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		pageCache &&
 		pageCacheKey &&
 		response.status === 200 &&
+		!/\b(private|no-cache|no-store)\b/i.test(response.headers.get('Cache-Control') || '') &&
 		response.headers.get('Content-Type')?.includes('text/html') &&
 		!response.headers.has('Set-Cookie')
 	) {

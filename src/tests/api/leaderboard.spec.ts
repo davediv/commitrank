@@ -116,6 +116,19 @@ describe('GET /api/leaderboard', () => {
 		vi.mocked(setCached).mockResolvedValue();
 	});
 
+	it('returns an empty out-of-range page without persisting a KV variant', async () => {
+		const db = createMockDb();
+		db.offset.mockResolvedValue([]);
+		vi.mocked(createDb).mockReturnValue(db as any);
+		const response = await GET(
+			createMockRequestEvent({ url: new URL('http://localhost/api/leaderboard?page=99999') })
+		);
+		expect(response.status).toBe(200);
+		const body = (await response.json()) as { data: { leaderboard: unknown[] } };
+		expect(body.data.leaderboard).toEqual([]);
+		expect(setCached).not.toHaveBeenCalled();
+	});
+
 	describe('Rate Limiting', () => {
 		it('should return 429 when rate limited', async () => {
 			vi.mocked(checkRateLimit).mockResolvedValue({
