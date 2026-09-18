@@ -92,7 +92,6 @@ export async function fetchAndCacheAvatar(
 			size: String(normalizedSize)
 		});
 
-		console.log(`[Avatar] Cached avatar for ${username} (${data.byteLength} bytes)`);
 		return { data, contentType };
 	} catch (error) {
 		console.error(
