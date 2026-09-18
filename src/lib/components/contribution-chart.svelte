@@ -78,6 +78,8 @@
 
 	function buildChartData(contribs: ContributionDayData[], width: number) {
 		if (contribs.length === 0) return null;
+		const drawWidth = width - PADDING_LEFT - PADDING_RIGHT;
+		if (drawWidth <= 0) return null;
 
 		const sortedContributions = [...contribs].sort((a, b) => a.date.localeCompare(b.date));
 		const dayTotals: Record<string, number> = {};
@@ -117,10 +119,7 @@
 		// Round the axis up to a readable number so the labels are 4,000 / 2,000 / 0
 		// rather than 3,153 / 1,577 / 0.
 		const maxVal = niceCeiling(Math.max(...weeks.map((w) => w.total), 1));
-		const drawWidth = width - PADDING_LEFT - PADDING_RIGHT;
 		const drawHeight = CHART_HEIGHT - PADDING_TOP - PADDING_BOTTOM;
-
-		if (drawWidth <= 0) return null;
 
 		// Generate points
 		const points: ChartPoint[] = weeks.map((w, i) => {
