@@ -84,7 +84,8 @@ export function githubKey(username: string): string {
  * Generate a cache key for stats data
  */
 export function statsKey(): string {
-	return CACHE_KEYS.STATS;
+	// Avoid reading partial homepage payloads written before the shared contract.
+	return `${CACHE_KEYS.STATS}:v2`;
 }
 
 /**

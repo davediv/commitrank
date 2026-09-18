@@ -102,7 +102,7 @@ describe('Cache Utilities', () => {
 
 	describe('statsKey', () => {
 		it('should return the stats key', () => {
-			expect(statsKey()).toBe('stats');
+			expect(statsKey()).toBe('stats:v2');
 		});
 	});
 

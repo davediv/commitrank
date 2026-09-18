@@ -3,6 +3,7 @@ import { createDb } from '$lib/server/db';
 import { users, contributions } from '$lib/server/db/schema';
 import { eq, sql, desc, and, gte } from 'drizzle-orm';
 import { getCached, setCached, leaderboardKey, statsKey, CACHE_TTL } from '$lib/server/cache';
+import { queryStats as queryCompleteStats } from '$lib/server/stats';
 import { calculateNextHourlySync } from '$lib/server/sync-config';
 import type { ContributionPeriod, LeaderboardResponse, StatsResponse } from '$lib/types';
 
@@ -127,28 +128,7 @@ async function queryLeaderboard(
 
 async function queryStats(db: Database): Promise<LoadResult<StatsResponse | null>> {
 	try {
-		const today = new Date().toISOString().slice(0, 10);
-		const [totalUsersResult, todayContribResult, lastSyncResult] = await Promise.all([
-			db.select({ count: sql<number>`COUNT(*)` }).from(users),
-			db
-				.select({
-					total: sql<number>`COALESCE(SUM(${contributions.total_contributions}), 0)`
-				})
-				.from(contributions)
-				.where(eq(contributions.date, today)),
-			db.select({ updated_at: sql<string>`MAX(${users.updated_at})` }).from(users)
-		]);
-
-		return {
-			data: {
-				total_users: Number(totalUsersResult[0]?.count || 0),
-				total_contributions_today: Number(todayContribResult[0]?.total || 0),
-				total_contributions_year: 0,
-				last_sync: lastSyncResult[0]?.updated_at || null,
-				next_sync: calculateNextHourlySync()
-			},
-			cacheable: true
-		};
+		return { data: await queryCompleteStats(db), cacheable: true };
 	} catch (error) {
 		console.error('Stats load error:', error);
 		return { data: null, cacheable: false };
