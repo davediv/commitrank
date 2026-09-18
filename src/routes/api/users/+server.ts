@@ -1,7 +1,8 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { createDb } from '$lib/server/db';
-import { users, contributions } from '$lib/server/db/schema';
+import { insertContributions } from '$lib/server/db/contribution-inserts';
+import { users } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
 import {
 	createSuccessResponse,
@@ -152,7 +153,7 @@ export const POST: RequestHandler = async ({ request, platform, getClientAddress
 				}));
 
 			if (contributionValues.length > 0) {
-				await db.insert(contributions).values(contributionValues);
+				await insertContributions(db, contributionValues);
 			}
 		}
 
