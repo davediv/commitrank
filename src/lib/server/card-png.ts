@@ -10,6 +10,7 @@
  */
 
 import { Buffer } from 'node:buffer';
+import { recordCacheOutcome } from './cpu-observability.js';
 import { initWasm, Resvg } from '@resvg/resvg-wasm';
 import { CARD_RASTER_SIZE } from '$lib/card-layout';
 import { getCardFonts } from './card-fonts';
@@ -51,6 +52,7 @@ export async function renderCardPng(options: CardSvgOptions): Promise<Uint8Array
 }
 
 export async function renderCardSvgPng(svg: string): Promise<Uint8Array> {
+	recordCacheOutcome('compute', 'render', 'card', 1);
 	await ensureWasm();
 
 	const resvg = new Resvg(svg, {
