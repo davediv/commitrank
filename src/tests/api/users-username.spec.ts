@@ -12,6 +12,7 @@ vi.mock('$lib/server/cache', () => ({
 	setCached: vi.fn(),
 	deleteCached: vi.fn(),
 	userKey: vi.fn((username) => `user:${username.toLowerCase()}`),
+	profilePageKey: vi.fn((username) => `profile:${username.toLowerCase()}`),
 	CACHE_TTL: { USER: 600 }
 }));
 
