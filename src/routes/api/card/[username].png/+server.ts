@@ -137,13 +137,14 @@ export const GET: RequestHandler = async ({ params, platform, url }) => {
 			avatarDataUri
 		});
 
-		const write = setBinary(kv, key, toArrayBuffer(png), CACHE_TTL.CARD, {
+		const body = toArrayBuffer(png);
+		const write = setBinary(kv, key, body, CACHE_TTL.CARD, {
 			contentType: 'image/png'
 		});
 		if (platform?.ctx) platform.ctx.waitUntil(write);
 		else await write;
 
-		return pngResponse(png, 'MISS');
+		return pngResponse(body, 'MISS');
 	} catch (error) {
 		console.error(
 			JSON.stringify({
